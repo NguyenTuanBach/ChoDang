@@ -105,9 +105,46 @@ class Settings(BaseSettings):
     #: Regex mã sinh viên để che PII ở lịch sử/audit (trống = không che theo mã). Cùng biến với agent.
     pii_student_id_pattern: str = ""
 
+    # ---- Nghiệp vụ thực tập ----
+    #: Địa chỉ FE dùng trong email (liên kết đăng nhập, việc cần làm).
+    app_base_url: str = "http://localhost:3000"
+    #: Khóa (đợt) thực tập hiện hành: hồ sơ mới của sinh viên thuộc khóa này.
+    current_cohort: str = "2026-K1"
+    #: Thư mục lưu tệp khi chưa cấu hình R2 (riêng tư, không phục vụ trực tiếp qua HTTP). Trống = ``<repo>/.data/files``.
+    storage_local_dir: str = ""
+    upload_max_bytes: int = 10 * 1024 * 1024
+    #: LMS: ``mini`` (LMS mini trong hệ thống) hoặc adapter khác sau này.
+    lms_adapter: str = "mini"
+    lms_internship_course_code: str = "TT-101"
+    lms_internship_credits: int = 4
+    lms_sync_max_attempts: int = 5
+
+    # ---- Job nền (trong tiến trình BE; khóa advisory Postgres chống chạy đôi) ----
+    jobs_enabled: bool = True
+    jobs_interval_seconds: int = 300
+    #: Giờ (múi giờ nghiệp vụ) gửi email tổng hợp hằng ngày cho giảng viên và chạy giám sát.
+    daily_digest_hour: int = 7
+    monitor_enabled: bool = True
+    reminder_window_start_hour: int = 7
+    reminder_window_end_hour: int = 21
+    reminder_max_per_day: int = 1
+    reminder_max_per_milestone: int = 3
+
     # ---- Ngưỡng điều kiện công nhận tín chỉ (bản mẫu, khớp bộ quy chế mẫu; thay bằng quy chế thật) ----
     credit_min_weeks: int = 8
     credit_min_journal_ratio: float = 0.8
+
+    @property
+    def uses_r2(self) -> bool:
+        return all(v.strip() for v in (self.r2_endpoint, self.r2_access_key_id, self.r2_secret_access_key, self.r2_bucket))
+
+    @property
+    def uses_smtp(self) -> bool:
+        return bool(self.smtp_user.strip() and self.smtp_password.strip())
+
+    @property
+    def local_storage_path(self) -> Path:
+        return Path(self.storage_local_dir) if self.storage_local_dir.strip() else REPOSITORY_ROOT / ".data" / "files"
 
     @property
     def cors_origin_list(self) -> list[str]:

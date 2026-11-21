@@ -5,7 +5,9 @@ from .database_unavailable_error import DatabaseUnavailableError
 from .forbidden_role_error import ForbiddenRoleError
 from .invalid_input_error import InvalidInputError
 from .permission_denied_error import PermissionDeniedError
+from .reason_required_error import ReasonRequiredError
 from .resource_not_found_error import ResourceNotFoundError
+from .scope_denied_error import ScopeDeniedError
 from .state_conflict_error import StateConflictError
 
 __all__ = [
@@ -16,6 +18,8 @@ __all__ = [
     "ForbiddenRoleError",
     "InvalidInputError",
     "PermissionDeniedError",
+    "ReasonRequiredError",
     "ResourceNotFoundError",
+    "ScopeDeniedError",
     "StateConflictError",
 ]

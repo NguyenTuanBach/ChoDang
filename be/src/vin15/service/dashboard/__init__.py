@@ -1,4 +1,1 @@
-"""Số liệu toàn khóa cho QTV và GV trong phạm vi (D7, D8).
-
-Chưa cài đặt. Mã yêu cầu tham chiếu docs/nghiep-vu-thuc-tap.md.
-"""
+"""Dashboard toàn khóa, danh sách tổng hợp, hàng chờ duyệt và xuất báo cáo (A11, A12, D7, D8)."""

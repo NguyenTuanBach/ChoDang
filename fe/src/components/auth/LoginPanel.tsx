@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { devLogin, listDevAccounts, ROLE_LABEL, type AuthUser, type Role } from "@/lib/auth";
+import { devLogin, fetchProviders, listDevAccounts, ROLE_LABEL, type AuthUser, type Role } from "@/lib/auth";
 import styles from "./auth.module.css";
 
 const ROLE_ORDER: Role[] = ["admin", "lecturer", "student"];
@@ -14,8 +14,18 @@ export default function LoginPanel({ fetchImpl }: { fetchImpl?: typeof fetch }) 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  const [google, setGoogle] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
+    fetchProviders(fetchImpl).then((p) => {
+      if (!cancelled) setGoogle(p.google);
+    });
+    // Google chuyển về /login?error=... khi đăng nhập thất bại (vd email chưa được mời).
+    queueMicrotask(() => {
+      const message = new URLSearchParams(window.location.search).get("error");
+      if (!cancelled && message) setError(message);
+    });
     listDevAccounts(fetchImpl)
       .then((list) => {
         if (!cancelled) setAccounts(list);
@@ -48,8 +58,10 @@ export default function LoginPanel({ fetchImpl }: { fetchImpl?: typeof fetch }) 
 
       <section className={styles.section}>
         <h2>Đăng nhập bằng Google</h2>
-        <p className={styles.hint}>Dành cho tài khoản đã được mời qua email. Chưa bật ở bản này.</p>
-        <button type="button" className={styles.google} disabled>
+        <p className={styles.hint}>
+          Dành cho tài khoản đã được mời qua email.{google ? "" : " Chưa cấu hình GOOGLE_CLIENT_ID/SECRET ở BE."}
+        </p>
+        <button type="button" className={styles.google} disabled={!google} onClick={() => window.location.assign("/api/auth/google/login")}>
           Đăng nhập Google
         </button>
       </section>

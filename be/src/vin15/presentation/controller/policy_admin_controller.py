@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from vin15.config.container import Container
-from vin15.domain.exception import PermissionDeniedError, ResourceNotFoundError
-from vin15.domain.model.user import Role, User
+from vin15.domain.exception import ResourceNotFoundError
+from vin15.domain.model.user import User
 from vin15.presentation.dto.policy_admin import (
     PolicyChunkPreview,
     PolicyIngestRequest,
@@ -15,15 +15,9 @@ from vin15.presentation.dto.policy_admin import (
     PolicyVersionDto,
 )
 
-from .dependencies import container, current_user
+from .dependencies import admin_user, container
 
 router = APIRouter(prefix="/api/admin/policies", tags=["Quy định (quản trị)"])
-
-
-def admin_user(user: User = Depends(current_user)) -> User:
-    if user.role != Role.ADMIN:
-        raise PermissionDeniedError("Chỉ quản trị viên được quản lý văn bản quy định")
-    return user
 
 
 @router.get("", response_model=list[PolicyVersionDto], summary="Danh sách phiên bản văn bản quy định")

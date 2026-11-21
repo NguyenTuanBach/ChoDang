@@ -19,9 +19,10 @@ infrastructure/   nối ra ngoài, chỉ phụ thuộc vào trong
   agent_api/        client gọi agent-api (HTTP + WebSocket, service token)
   persistence/      Database (psycopg pool), SqlMigrator, *_repository.py
   security/         token HS256 (phiên và agent-token có claim scope)
-  storage/ mail/ oauth/   R2, Gmail SMTP, Google OAuth   (chưa cài đặt)
+  storage/ mail/ oauth/   R2 (hoặc đĩa cục bộ), Gmail SMTP (hoặc chỉ ghi log), Google OAuth
+  lms/              LMS mini: nơi DUY NHẤT được đụng bảng `lms_*` (adapter của LmsPort + giao diện quản trị)
 service/          nghiệp vụ, chia theo tính năng (auth, user, internship, outline, milestone, progress,
-                  exception, credit, policy, monitoring, notification, audit, dashboard, lms, agent)
+                  exception, credit, policy, monitoring, notification, audit, dashboard, lms, agent, jobs, files)
 presentation/     HTTP: controller/, dto/, advice/ (xử lý lỗi), rate_limit.py
 resources/db/migration/   V<số>__<mô_tả>.sql  (kiểu Flyway)
 ```
@@ -48,11 +49,22 @@ Hướng phụ thuộc (kiểm bởi `tests/test_architecture.py`):
 | `POST /api/agent-tools/policy/search`, `GET /api/agent-tools/policy/chunks/{id}` | Tool tra quy định đang hiệu lực (agent gọi; service token + `X-On-Behalf-Of`) |
 | `GET /api/agent-tools/me/{internship,milestones,progress,credit-checklist,requests}` | Tool cá nhân chỉ-đọc, chủ thể do BE quyết; chỉ sinh viên. Lỗi theo hợp đồng `{"error":{"code","message"}}` |
 | `GET/POST /api/admin/policies…` | Quản trị viên: nạp văn bản (tách Điều/Khoản, bản nháp), xem trước, xuất bản |
+| `/api/auth/{me,logout,providers,google/login,google/callback}`, `/api/auth/dev-*` | Phiên cookie; Google OAuth (chỉ email đã mời); đăng nhập dev (ngoài production) |
+| `/api/invitations…`, `/api/lecturers`, `/api/students/{id}/{advisor,code}` | Mời GV (QTV) / SV (GV, QTV), thu hồi, mời lại, gán GV phụ trách, mã sinh viên |
+| `/api/student/internship…`, `/api/documents/{id}/download` | SV: hồ sơ, giấy tiếp nhận, AI gợi ý trường, kiểm trước khi nộp, nộp, nộp kết thúc |
+| `/api/internships…`, `/api/queue`, `/api/internships/export.csv` | GV/QTV: danh sách có lọc, chi tiết, quyết định hồ sơ, tiền thẩm AI, hàng chờ, xuất CSV |
+| `/api/student/outlines`, `/api/outlines/{id}/decision` | Đề cương (phiên bản) và quyết định của GV |
+| `/api/student/milestones/{code}/{submit,evidence}`, `/api/milestones/{id}/{accept,reject}`, `/api/student/journal`, `/api/journal/{id}/comment`, `/api/evidence/{id}/download` | Mốc, minh chứng (kiểm loại tệp thật), nhật ký tuần |
+| `/api/student/requests…`, `/api/requests/{pending,…/decision}`, `/api/exception-types` | Gia hạn mốc, ngoại lệ; GV duyệt loại thường, QTV duyệt loại ảnh hưởng tín chỉ |
+| `/api/internships/{id}/credit[/assess\|/decision]` | Bảng T1–T6, GV thẩm định, QTV phê duyệt cuối (tạo việc ghi LMS cùng transaction) |
+| `/api/flags…`, `/api/notifications…` | Cờ rủi ro (chỉ người xử lý), thông báo trong ứng dụng |
+| `/api/dashboard[/export.csv]`, `/api/admin/audit`, `/api/config/*`, `/api/admin/{milestone-templates,outcomes,exception-types}` | Dashboard, audit, cấu hình của QTV |
+| `/api/lms/*`, `/api/admin/lms/*` | LMS mini: bảng điểm của tôi, học phần, tiên quyết, điểm (CSV), việc đồng bộ |
 
 Hợp đồng chi tiết: `.kiro/specs/agent-hoi-dap/contract.md`. Mọi `/api/agent-tools/*` ghi `audit_event` `actor_kind='agent'`.
 
 ## Dev: người dùng mặc định và dữ liệu giả
-Chưa có đăng nhập thật. `AGENT_DEV_DEFAULT_USER_EMAIL` (chỉ dev; production **không khởi động** nếu đặt) chọn chủ thể cho tool agent khi
+Đăng nhập: Google OAuth (đặt `GOOGLE_*`, chỉ email đã được mời) hoặc đăng nhập dev (ngoài production). `AGENT_DEV_DEFAULT_USER_EMAIL` (chỉ dev; production **không khởi động** nếu đặt) chọn chủ thể cho tool agent khi
 request không có agent-token và cho `ws-ticket` khi không có token phiên. `make seed-dev` (từ chối khi `APP_ENV=production`, chạy lại được) tạo
 QTV `qtv@example.test`, GV `gv@example.test`, SV A `sv.a@example.test` (trễ mốc M3, thiếu nhật ký), SV B `sv.b@example.test` (đã nộp báo cáo cuối),
 SV C `sv.c@example.test` (chưa có hồ sơ) và bộ quy chế mẫu `is_sample=true` (`resources/seed/policies/*.md`). Có `AGENT_API_URL` và agent chạy thì

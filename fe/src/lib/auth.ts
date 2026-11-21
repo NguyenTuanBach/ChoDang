@@ -49,6 +49,18 @@ export async function devLogin(email: string, fetchImpl: Fetch = fetch): Promise
   return (await response.json()) as AuthUser;
 }
 
+// Cách đăng nhập đang bật ở BE. Lỗi hoặc dữ liệu lạ thì coi như chưa bật Google (không chặn trang đăng nhập).
+export async function fetchProviders(fetchImpl: Fetch = fetch): Promise<{ google: boolean }> {
+  try {
+    const response = await fetchImpl("/api/auth/providers", { cache: "no-store" });
+    if (!response.ok) return { google: false };
+    const body = (await response.json()) as { google?: unknown };
+    return { google: body?.google === true };
+  } catch {
+    return { google: false };
+  }
+}
+
 export async function logout(fetchImpl: Fetch = fetch): Promise<void> {
   const response = await fetchImpl("/api/auth/logout", { method: "POST" });
   if (!response.ok) throw new Error(await readError(response));

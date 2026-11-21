@@ -17,8 +17,18 @@ Hoặc chạy cả BE, agent và FE bằng `scripts/start.sh` ở gốc repo.
 - `next.config.ts` có `rewrites`: `/api/:path*` → `${BE_URL}/api/:path*` (`BE_URL` mặc định `http://localhost:8000`).
   Trình duyệt chỉ gọi `/api/...` cùng origin với FE nên không vướng CORS; `BE_URL` chỉ nằm phía server.
 - Server Component gọi thẳng BE bằng `getFromBackend` trong `src/lib/api.ts`.
-- Trang chủ là trang kiểm tra kết nối: `ServerStatus` (server gọi `/api/health/readiness` và `/api/agent/health`)
-  và `ClientPing` (trình duyệt gọi `/api/health` qua proxy).
+- Trang chủ `/` chuyển người dùng về trang đầu của vai trò (`/student`, `/lecturer`, `/admin`). `ServerStatus`/`ClientPing` (kiểm tra kết nối) còn trong
+  `src/components` nhưng không còn được trang nào dùng.
+
+## Giao diện theo vai trò
+- `AuthGate roles={[...]}` (`src/components/auth/AuthGate.tsx`) chặn người chưa đăng nhập, chuyển vai trò không phù hợp về trang chủ của họ, dựng menu (`src/lib/nav.ts`),
+  số thông báo chưa đọc và cung cấp người dùng qua `useCurrentUser()`.
+- Sinh viên `/student/*`: tổng quan, hồ sơ (AI gợi ý trường, kiểm trước khi nộp), đề cương, mốc và minh chứng, nhật ký, gia hạn/ngoại lệ, kết thúc và tín chỉ, bảng điểm LMS.
+- Giảng viên `/lecturer/*`: hàng chờ, sinh viên (mời), hồ sơ (lọc, xuất CSV, chi tiết: xác nhận, duyệt, chấp nhận mốc, nhận xét, thẩm định, tiền thẩm AI), yêu cầu, cờ rủi ro.
+- Quản trị viên `/admin/*`: hàng chờ, tài khoản (mời GV/SV, gán GV phụ trách, mã SV), hồ sơ, yêu cầu ảnh hưởng tín chỉ, phê duyệt tín chỉ, cấu hình (mốc mẫu, chuẩn đầu ra,
+  loại ngoại lệ), LMS (học phần, tiên quyết, điểm, đồng bộ), audit. Dùng chung: `/dashboard`, `/notifications`, `/assistant`.
+- Gọi API: `src/lib/http.ts` (`api`, `send`, `upload`), hook `useApi`/`useAction` (`src/lib/hooks.ts`), kiểu dữ liệu `src/lib/types.ts`, nhãn `src/lib/labels.ts`,
+  thành phần dùng chung `src/components/ui/ui.tsx` (CSS Modules, không thư viện UI). Bước nhập lý do bắt buộc dùng `DecisionPanel` (BR-S2).
 
 ## Trợ lý hỏi đáp (`/assistant`)
 - Mã: `src/lib/assistant/` (`reducer.ts` trạng thái theo `turn_id`, `useAssistant.ts` hook WebSocket, `client.ts` ticket/REST/URL WS,

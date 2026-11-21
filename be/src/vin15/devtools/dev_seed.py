@@ -106,29 +106,34 @@ def _seed_people(database: Database, today: date, report: SeedReport) -> None:
     with database.connection() as conn:
         admin = _user(conn, ADMIN_EMAIL, "Quản trị viên mẫu", "admin", None)
         lecturer = _user(conn, LECTURER_EMAIL, "Cô Nguyễn Thị Lan (mẫu)", "lecturer", admin)
-        student_a = _user(conn, STUDENT_A_EMAIL, "Sinh viên A (mẫu)", "student", lecturer)
-        student_b = _user(conn, STUDENT_B_EMAIL, "Sinh viên B (mẫu)", "student", lecturer)
-        _user(conn, STUDENT_C_EMAIL, "Sinh viên C (mẫu, chưa có hồ sơ)", "student", lecturer)
+        student_a = _user(conn, STUDENT_A_EMAIL, "Sinh viên A (mẫu)", "student", lecturer, "SV0001", lecturer)
+        student_b = _user(conn, STUDENT_B_EMAIL, "Sinh viên B (mẫu)", "student", lecturer, "SV0002", lecturer)
+        _user(conn, STUDENT_C_EMAIL, "Sinh viên C (mẫu, chưa có hồ sơ)", "student", lecturer, "SV0003", lecturer)
         report.users = 5
+        _seed_outcomes(conn)
         _seed_student_a(conn, student_a, lecturer, today)
         _seed_student_b(conn, student_b, lecturer, today)
+        _seed_lms(conn)
         report.internships = 2
 
 
-def _user(conn, email: str, name: str, role: str, invited_by: int | None) -> int:
+def _user(conn, email: str, name: str, role: str, invited_by: int | None, student_code: str | None = None, advisor_id: int | None = None) -> int:
     conn.execute(
-        "insert into app_user (email, full_name, role, status, invited_by, activated_at) values (%s, %s, %s, 'active', %s, now()) "
-        "on conflict (email) do nothing",
-        (email, name, role, invited_by),
+        "insert into app_user (email, full_name, role, status, invited_by, activated_at, student_code, advisor_id) "
+        "values (%s, %s, %s, 'active', %s, now(), %s, %s) on conflict (email) do nothing",
+        (email, name, role, invited_by, student_code, advisor_id),
     )
     return conn.execute("select id from app_user where email = %s", (email,)).fetchone()["id"]
 
 
 def _internship(conn, user_id: int, lecturer_id: int, status: str, start: date, end: date, mode: str) -> int:
     conn.execute(
-        "insert into internship (user_id, cohort, status, start_date, end_date, mode, lecturer_id) values (%s, %s, %s, %s, %s, %s, %s) "
+        "insert into internship (user_id, cohort, status, start_date, end_date, mode, lecturer_id, company_name, company_tax_code, company_address, "
+        "position, mentor_name, mentor_email, mentor_phone, job_description, submitted_at) "
+        "values (%s, %s, %s, %s, %s, %s, %s, 'Công ty TNHH Giải pháp Mẫu', %s, '12 Đường Mẫu, Quận 1, TP.HCM', 'Thực tập sinh phát triển phần mềm', "
+        "'Anh Trần Văn Mẫu', 'mentor@congty-mau.example', '0901234567', 'Tham gia phát triển và kiểm thử các module web của sản phẩm nội bộ.', now()) "
         "on conflict (user_id, cohort) do nothing",
-        (user_id, COHORT, status, start, end, mode, lecturer_id),
+        (user_id, COHORT, status, start, end, mode, lecturer_id, "0100000000" if user_id % 2 else "0100000001"),
     )
     return conn.execute("select id from internship where user_id = %s and cohort = %s", (user_id, COHORT)).fetchone()["id"]
 
@@ -147,8 +152,64 @@ def _milestones(conn, internship_id: int, items: list[tuple[str, str, date, str]
 def _journal(conn, internship_id: int, start: date, weeks: list[int]) -> None:
     for k in weeks:
         conn.execute(
-            "insert into journal_entry (internship_id, week_start) values (%s, %s) on conflict (internship_id, week_start) do nothing",
-            (internship_id, start + timedelta(days=7 * k)),
+            "insert into journal_entry (internship_id, week_start, content) values (%s, %s, %s) on conflict (internship_id, week_start) do nothing",
+            (internship_id, start + timedelta(days=7 * k), f"Tuần {k + 1}: làm việc với nhóm, hoàn thành các nhiệm vụ được giao và học thêm quy trình kiểm thử."),
+        )
+
+
+def _outline(conn, internship_id: int, status: str) -> None:
+    conn.execute(
+        "insert into outline (internship_id, version, content, outcome_codes, status, decided_at) select %s, 1, %s, %s, %s, now() "
+        "where not exists (select 1 from outline where internship_id = %s)",
+        (
+            internship_id,
+            "Mục tiêu: vận dụng kiến thức lập trình web vào dự án thực tế; thực hiện phát triển và kiểm thử module, báo cáo tiến độ hằng tuần cho người hướng dẫn.",
+            ["LO1", "LO2"],
+            status,
+            internship_id,
+        ),
+    )
+
+
+def _seed_outcomes(conn) -> None:
+    outcomes = [
+        ("LO1", "Vận dụng kiến thức chuyên ngành vào công việc thực tế"),
+        ("LO2", "Làm việc nhóm và giao tiếp trong môi trường doanh nghiệp"),
+        ("LO3", "Tuân thủ quy trình, chuẩn mực nghề nghiệp"),
+        ("LO4", "Tự học và báo cáo kết quả công việc"),
+    ]
+    for code, description in outcomes:
+        conn.execute(
+            "insert into learning_outcome (cohort, code, description) values (%s, %s, %s) on conflict (cohort, code) do nothing",
+            (COHORT, code, description),
+        )
+
+
+def _seed_lms(conn) -> None:
+    """LMS mini: học phần, tiên quyết của học phần thực tập TT-101 (CS101 và CS201 từ 5 điểm) và điểm mẫu. SV C chưa đủ tiên quyết."""
+    for code, name, credits, kind in [
+        ("MATH101", "Toán cao cấp", 3, "regular"),
+        ("CS101", "Nhập môn lập trình", 3, "regular"),
+        ("CS201", "Cấu trúc dữ liệu và giải thuật", 3, "regular"),
+        ("TT-101", "Thực tập doanh nghiệp", 4, "internship"),
+    ]:
+        conn.execute("insert into lms_course (code, name, credits, kind) values (%s, %s, %s, %s) on conflict (code) do nothing", (code, name, credits, kind))
+    for required in ("CS101", "CS201"):
+        conn.execute(
+            "insert into lms_prerequisite (course_code, required_course_code, min_score) values ('TT-101', %s, 5.0) on conflict do nothing", (required,)
+        )
+    students = [("SV0001", "Sinh viên A (mẫu)"), ("SV0002", "Sinh viên B (mẫu)"), ("SV0003", "Sinh viên C (mẫu, chưa có hồ sơ)")]
+    for code, name in students:
+        conn.execute("insert into lms_student (student_code, full_name) values (%s, %s) on conflict do nothing", (code, name))
+    grades = [
+        ("SV0001", "CS101", 8.0), ("SV0001", "CS201", 7.5), ("SV0001", "MATH101", 7.0),
+        ("SV0002", "CS101", 7.0), ("SV0002", "CS201", 6.0),
+        ("SV0003", "CS101", 4.0), ("SV0003", "MATH101", 6.5),
+    ]
+    for student_code, course_code, score in grades:
+        conn.execute(
+            "insert into lms_grade (student_code, course_code, score, term) values (%s, %s, %s, '2025-2026') on conflict do nothing",
+            (student_code, course_code, score),
         )
 
 
@@ -194,6 +255,7 @@ def _seed_student_a(conn, user_id: int, lecturer_id: int, today: date) -> None:
         ],
     )
     _journal(conn, internship, start, [0, 1, 2, 4])
+    _outline(conn, internship, "approved")
     _evidence(conn, milestones["M2"], "Đề cương thực tập", "accepted")
     _request(conn, internship, "milestone_extension", "open")
 
@@ -215,6 +277,7 @@ def _seed_student_b(conn, user_id: int, lecturer_id: int, today: date) -> None:
         ],
     )
     _journal(conn, internship, start, [k for k in range(12) if k != 5])
+    _outline(conn, internship, "approved")
     _evidence(conn, milestones["M3"], "Báo cáo giữa kỳ", "accepted")
     _evidence(conn, milestones["M4"], "Báo cáo cuối kỳ", "submitted")
 

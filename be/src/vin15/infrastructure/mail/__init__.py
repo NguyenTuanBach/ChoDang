@@ -1,1 +1,5 @@
-"""Gửi email (mời, nhắc nhở, thông báo) qua Gmail SMTP. Chưa cài đặt; cấu hình ``SMTP_*`` trong settings."""
+"""Gửi email: Gmail SMTP khi có ``SMTP_USER``/``SMTP_PASSWORD``, ngược lại chỉ ghi log (dev)."""
+
+from .smtp_mailer import LogMailer, SmtpMailer
+
+__all__ = ["LogMailer", "SmtpMailer"]

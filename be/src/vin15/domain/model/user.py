@@ -26,3 +26,7 @@ class User:
     role: Role
     status: UserStatus
     invited_by: int | None = None
+    #: Mã sinh viên: khóa ánh xạ sang LMS (chỉ sinh viên).
+    student_code: str | None = None
+    #: Giảng viên phụ trách (chỉ sinh viên).
+    advisor_id: int | None = None

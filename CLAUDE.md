@@ -20,10 +20,13 @@ Có **khung** và **một tính năng đầu tiên: Trợ lý chính sách** (k�
   seed dev (`make seed-dev`); agent: vòng lặp tool, `search_policy`/`get_policy_clause`/`get_my_*`, che PII, trích dẫn, chế độ suy giảm,
   bộ eval (`make agent-eval`); FE `fe/`: trang kiểm tra kết nối và chat `/assistant`.
 - **Có thêm**: đăng nhập dev (`/login` → nút "Đăng nhập dev", `POST /api/auth/dev-login`, cookie phiên HttpOnly; chỉ ngoài production), `GET /api/auth/me`, `POST /api/auth/logout`.
-- **Chưa có**: đăng nhập Google thật (`AGENT_DEV_DEFAULT_USER_EMAIL` chỉ còn cho tool agent), `domain/statemachine` (mới có README),
-  `infrastructure/{mail,oauth,storage}`, bảng nghiệp vụ thật (hồ sơ, đề cương...), các agent khác (giám sát, tiền thẩm); quy chế trong DB là **bản mẫu**.
-- **Còn dở**: embedding quy chế (chạy lại `make seed-dev` khi agent gọi được OpenAI); lượt hỏi cá nhân đôi khi không gọi `get_my_*`; chưa chạy eval LLM thật.
-- **Thứ tự làm dự kiến**: hoàn thiện Trợ lý (P3/P4) → auth thật → state machine → luồng dọc đầu tiên (hồ sơ thực tập, đề cương) → agent khác.
+- **Có thêm (nghiệp vụ thực tập, xem `docs/changes/20261121-nghiep-vu-thuc-tap.md`)**: state machine (`domain/statemachine`), phân quyền theo vai trò và phạm vi,
+  mời tài khoản + Google OAuth, hồ sơ (AI gợi ý trường), đề cương, mốc/nhật ký/minh chứng (R2), gia hạn/ngoại lệ, thẩm định → phê duyệt tín chỉ, **LMS mini** (`infrastructure/lms`, sau `LmsPort`),
+  dashboard + CSV + audit, thông báo + email, job nền, giám sát + tiền thẩm (agent một-lượt không công cụ ghi), FE theo vai trò (`/student`, `/lecturer`, `/admin`). Migration `V5`–`V10`.
+- **Chưa kiểm tra**: toàn bộ code của đợt nghiệp vụ trên **chưa được chạy** (chưa có test cho phần mới, `pytest`/`vitest`/lint chưa chạy); cần smoke test và sửa lỗi nhỏ.
+- **Chưa có**: trang FE quản trị văn bản quy định, danh sách thu hồi token bền (đang ở RAM), adapter LMS thật (Moodle...); quy chế trong DB là **bản mẫu**.
+- **Còn dở**: embedding quy chế (chạy lại `make seed-dev` khi agent gọi được OpenAI); lượt hỏi cá nhân đôi khi không gọi `get_my_*`; chưa chạy eval LLM thật; tool `get_my_*` của Trợ lý chưa trả thêm trạng thái đề cương.
+- **Thứ tự làm tiếp**: smoke test + sửa lỗi → viết test cho phần mới → tích hợp LMS thật khi biết hệ thống của trường → quy chế thật (R1).
 
 ## Current Invariants (để không drift)
 
@@ -37,6 +40,9 @@ Có **khung** và **một tính năng đầu tiên: Trợ lý chính sách** (k�
 - **LLM**: mọi lời gọi đi qua `AiClient` (`core/ai_client.py`). Đường chính là OpenAI trực tiếp (`OPENAI_*`); proxy `AiClient`
   (`AICLIENT_*`) chỉ là dự phòng, chỉ dùng khi lỗi tạm thời (mất kết nối, timeout, 429, 5xx). Khóa là `SecretStr`, không log, không đưa vào prompt/commit.
 - **Agent không có công cụ quyết định**: không duyệt, chấp nhận, công nhận, ghi LMS. Quyền quyết định nằm ở BE (state machine).
+  Các agent một-lượt (chuẩn hóa hồ sơ, giám sát, tiền thẩm) **không có công cụ ghi**: BE gửi dữ liệu đã che PII, nhận kết luận cấu trúc rồi tự kiểm và ghi.
+- **Mọi đổi trạng thái đi qua `domain/statemachine`** và ghi audit cùng transaction; repository dùng `infrastructure/persistence/transitions.py` (`lock_status`/`set_status`).
+- **Bảng `lms_*` chỉ `infrastructure/lms` được đụng**; nghiệp vụ chỉ thấy `LmsPort`, sinh viên khớp bằng mã sinh viên. Ghi LMS chỉ qua `credit_sync_job` tạo trong transaction QTV phê duyệt.
 - **Mọi bảng mới phải bật RLS** (Supabase mở schema `public` qua khóa anon) — có test chặn.
 - **Migration đã áp dụng thì không sửa** (checksum lệch): thêm `V<n+1>__...sql` mới.
 - **Prompts**: nằm ở `agent/prompts/*.md` (external file, `{{placeholder}}`). KHÔNG nhúng prompt dài trong Python string.

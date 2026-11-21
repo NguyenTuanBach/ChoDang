@@ -3,7 +3,8 @@
 - ``GET /healthz``: không cần token, cho healthcheck của Docker.
 - ``GET /v1/info``: cần service token, để BE xác nhận kết nối và token khớp.
 - ``POST /v1/embeddings`` và ``WS /v1/policy-assistant/ws``: trợ lý hỏi đáp chính sách (``runtime/http/policy_assistant.py``).
-Các endpoint của agent khác (giám sát, tiền thẩm) sẽ thêm ở ``/v1/...`` và đều đòi token.
+- ``POST /v1/intake/extract``, ``/v1/monitor/review``, ``/v1/pre-review``: agent một-lượt có đầu ra cấu trúc, không công cụ ghi
+  (``runtime/http/structured_agents.py``). Tất cả đòi service token.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from vin15_agent import __version__
 from vin15_agent.core.ai_client import AiClient
 from vin15_agent.runtime.http.policy_assistant import register_policy_assistant
 from vin15_agent.runtime.http.security import service_token_matches
+from vin15_agent.runtime.http.structured_agents import register_structured_agents
 from vin15_agent.shared.settings import Settings, get_settings
 
 
@@ -37,10 +39,11 @@ def create_app(
     ai_client = ai_client or AiClient.from_settings(settings)
     app = FastAPI(title="VIN-15 Agent API", version=__version__)
     app.state.ai_client = ai_client
-    agents = ["policy_assistant"]
+    agents = ["policy_assistant", "intake", "monitor", "pre_review"]
     app.state.policy_assistant = register_policy_assistant(
         app, settings=settings, ai=ai_client, require_service_token=require_service_token, be_transport=be_transport
     )
+    register_structured_agents(app, settings=settings, ai=ai_client, require_service_token=require_service_token)
 
     @app.get("/healthz")
     def healthz() -> dict:

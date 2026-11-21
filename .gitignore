@@ -66,3 +66,6 @@ tests/ui/screens/
 # Wireframe: ảnh chụp kiểm tra tạm và bản zip trùng thư mục figma/ (sinh lại bằng docs/wireframe/export*.mjs)
 docs/wireframe/export/figma-check/
 docs/wireframe/vin15-wireframe-figma.zip
+
+# Tệp tải lên khi chưa dùng R2
+.data/

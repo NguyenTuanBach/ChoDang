@@ -22,7 +22,10 @@ _EXTENSIONS = ("vector", "unaccent", "btree_gist")
 #: Bảng nghiệp vụ, thứ tự xóa an toàn theo khóa ngoại (truncate ... cascade lo phần còn lại).
 DATA_TABLES = (
     "chat_message, chat_conversation, request, evidence, journal_entry, milestone, internship, "
-    "policy_chunk, policy_version, policy_document, audit_event, app_user"
+    "policy_chunk, policy_version, policy_document, audit_event, app_user, "
+    # Nghiệp vụ thực tập: bảng không có khóa ngoại tới các bảng trên. milestone_template và exception_type là cấu hình mặc định nên không xóa.
+    "notification, email_outbox, job_state, learning_outcome, "
+    "lms_credit_ledger, lms_grade, lms_prerequisite, lms_student, lms_course"
 )
 
 

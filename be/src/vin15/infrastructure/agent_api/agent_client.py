@@ -88,6 +88,26 @@ class AgentApiClient:
             raise AgentUnavailableError("agent-api trả embedding sai định dạng")
         return EmbeddingResult(model=str(body.get("model", "")), vectors=vectors)
 
+    async def call(self, path: str, body: dict[str, Any], *, timeout: float | None = None) -> dict[str, Any]:
+        """``POST <path>`` với thân JSON: cho các agent một-lượt có đầu ra cấu trúc (``/v1/intake/extract``, ``/v1/monitor/review``,
+        ``/v1/pre-review``). Agent **không** có công cụ ghi: BE kiểm kết quả rồi tự ghi.
+        """
+        if not self.enabled:
+            raise AgentUnavailableError("Chưa cấu hình AGENT_API_URL")
+        try:
+            async with httpx.AsyncClient(
+                base_url=self._base, headers=self._headers, timeout=timeout or max(self._timeout, _EMBED_MIN_TIMEOUT), transport=self._transport
+            ) as client:
+                response = await client.post(path, json=body)
+        except httpx.TimeoutException as error:
+            raise AgentTimeoutError("agent không trả lời đúng hạn") from error
+        except httpx.HTTPError as error:
+            raise AgentUnavailableError(f"không nối được agent-api: {type(error).__name__}") from error
+        if response.status_code != 200:
+            raise AgentUnavailableError(f"agent-api trả mã {response.status_code} cho {path}")
+        data = response.json()
+        return data if isinstance(data, dict) else {}
+
     async def chat(
         self, start: dict[str, Any], *, cancel: asyncio.Event | None = None, deadline_seconds: float | None = None
     ) -> AsyncIterator[dict[str, Any]]:

@@ -28,6 +28,21 @@ class InternshipRepository:
             row["id"], row["cohort"], row["status"], row["start_date"], row["end_date"], row["mode"], row["lecturer_name"] or None
         )
 
+    def by_id(self, internship_id: int) -> tuple[InternshipRecord, int] | None:
+        """Hồ sơ theo id (cho giảng viên/QTV), kèm ``user_id`` của sinh viên."""
+        with self._db.connection() as conn:
+            row = conn.execute(
+                "select i.id, i.user_id, i.cohort, i.status, i.start_date, i.end_date, i.mode, l.full_name as lecturer_name "
+                "from internship i left join app_user l on l.id = i.lecturer_id where i.id = %s",
+                (internship_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        record = InternshipRecord(
+            row["id"], row["cohort"], row["status"], row["start_date"], row["end_date"], row["mode"], row["lecturer_name"] or None
+        )
+        return record, row["user_id"]
+
     def milestones(self, internship_id: int) -> list[MilestoneRecord]:
         with self._db.connection() as conn:
             rows = conn.execute(

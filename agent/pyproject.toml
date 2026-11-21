@@ -16,6 +16,8 @@ dependencies = [
     "openai>=1.40",
     "python-dotenv>=1.0",
     "pyyaml>=6",
+    # Đọc văn bản từ PDF giấy tiếp nhận (chuẩn hóa hồ sơ).
+    "pypdf>=4",
 ]
 
 [project.scripts]

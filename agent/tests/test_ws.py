@@ -232,4 +232,4 @@ def test_embeddings_llm_unavailable_is_503_with_code():
 
 
 def test_info_lists_policy_assistant(client):
-    assert client.get("/v1/info", headers={"Authorization": "Bearer tok"}).json()["agents"] == ["policy_assistant"]
+    assert client.get("/v1/info", headers={"Authorization": "Bearer tok"}).json()["agents"] == ["policy_assistant", "intake", "monitor", "pre_review"]

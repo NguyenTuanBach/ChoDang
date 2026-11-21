@@ -6,6 +6,7 @@ Ngưỡng lấy từ cấu hình (bản mẫu, khớp bộ quy chế mẫu); tha
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -28,17 +29,38 @@ class CreditChecklist:
 
 
 class CreditChecklistService:
-    def __init__(self, repository: InternshipRepository, lms: LmsPort, clock: Clock, min_weeks: int, min_journal_ratio: float):
+    def __init__(
+        self,
+        repository: InternshipRepository,
+        lms: LmsPort,
+        clock: Clock,
+        min_weeks: int,
+        min_journal_ratio: float,
+        student_code_of: Callable[[int], str | None] | None = None,
+    ):
         self._repo = repository
         self._lms = lms
         self._clock = clock
         self._min_weeks = min_weeks
         self._min_ratio = min_journal_ratio
+        #: Tra mã sinh viên (khóa của LMS) từ id người dùng; mặc định không có mã.
+        self._student_code_of = student_code_of or (lambda _user_id: None)
 
     def checklist(self, user_id: int) -> CreditChecklist:
+        """Bảng T1-T6 của hồ sơ mới nhất của một sinh viên (cho tool ``get_my_credit_checklist``)."""
         record = self._repo.latest_internship(user_id)
         if record is None:
             return CreditChecklist(False, NO_RECORD)
+        return self._build(record, user_id)
+
+    def checklist_for_internship(self, internship_id: int) -> CreditChecklist:
+        """Bảng T1-T6 theo mã hồ sơ (cho giảng viên thẩm định và QTV phê duyệt)."""
+        found = self._repo.by_id(internship_id)
+        if found is None:
+            return CreditChecklist(False, NO_RECORD)
+        return self._build(*found)
+
+    def _build(self, record: InternshipRecord, user_id: int) -> CreditChecklist:
         today = self._clock()
         milestones = self._repo.milestones(record.id)
         weeks = self._repo.journal_week_starts(record.id)
@@ -105,7 +127,6 @@ class CreditChecklistService:
         return CreditItem("T5", "Phiếu đánh giá doanh nghiệp đã được giảng viên xác thực", met, value, "đã xác thực")
 
     def _t6(self, user_id: int) -> CreditItem:
-        met = self._lms.prerequisites_met(user_id)
-        return CreditItem(
-            "T6", "Đủ điều kiện tiên quyết học phần (theo LMS)", met, "đủ điều kiện" if met else "chưa đủ điều kiện", "đủ điều kiện"
-        )
+        status = self._lms.prerequisite_status(self._student_code_of(user_id))
+        value = "đủ điều kiện" if status.met else "chưa đủ: " + "; ".join(status.missing) if status.missing else "chưa đủ điều kiện"
+        return CreditItem("T6", "Đủ điều kiện tiên quyết học phần (theo LMS)", status.met, value, "đủ điều kiện")

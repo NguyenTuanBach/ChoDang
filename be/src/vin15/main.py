@@ -16,12 +16,18 @@ from .config.settings import Settings, get_settings
 from .infrastructure.persistence.migrations import SqlMigrator
 from .presentation.advice.global_exception_handler import register_exception_handlers
 from .presentation.controller import (
+    account_controller,
+    admin_controller,
     agent_controller,
     agent_tools_controller,
     assistant_controller,
     auth_controller,
     health_controller,
+    inbox_controller,
+    internship_controller,
     policy_admin_controller,
+    progress_controller,
+    request_controller,
 )
 from .presentation.rate_limit import RateLimitMiddleware, Rule
 
@@ -47,7 +53,14 @@ def create_app(settings: Settings | None = None, container: Container | None = N
             if settings.migrations_enabled:
                 applied = await anyio.to_thread.run_sync(SqlMigrator(database).migrate)
                 log.info("Migration đã áp dụng: %s", applied or "không có")
-        yield
+            created = await anyio.to_thread.run_sync(container.account_service.bootstrap_admins, settings.admin_email_list)
+            if created:
+                log.info("Đã khởi tạo %d quản trị viên từ APP_ADMIN_EMAILS", created)
+        async with anyio.create_task_group() as tasks:
+            if database is not None and settings.jobs_enabled:
+                tasks.start_soon(container.job_runner.run_forever)
+            yield
+            tasks.cancel_scope.cancel()
         if database is not None:
             await anyio.to_thread.run_sync(database.close)
 
@@ -78,6 +91,12 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     app.include_router(agent_tools_controller.router)
     app.include_router(assistant_controller.router)
     app.include_router(policy_admin_controller.router)
+    app.include_router(account_controller.router)
+    app.include_router(internship_controller.router)
+    app.include_router(progress_controller.router)
+    app.include_router(request_controller.router)
+    app.include_router(inbox_controller.router)
+    app.include_router(admin_controller.router)
     return app
 
 

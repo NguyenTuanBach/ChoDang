@@ -121,9 +121,11 @@ def test_t4_ratio_boundary():
 
 
 def test_t5_states_and_t6_from_lms():
+    from vin15.domain.model.lms import PrerequisiteStatus
+
     class NoLms:
-        def prerequisites_met(self, user_id):
-            return False
+        def prerequisite_status(self, student_code):
+            return PrerequisiteStatus(False, ["thiếu học phần"])
 
     done, _ = items(record(), milestones(), [], START)
     assert done["T5"].met and done["T5"].value == "đã xác thực" and done["T6"].met
