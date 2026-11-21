@@ -1,11 +1,8 @@
-CITATION CONTRACT (inspire team 006 — citation là contract với frontend)
-
-1. Mỗi nhận định dựa trên Context phải kèm [cite:chunk_id] trong answer.
-2. Citation_id phải LÀ chunk_id có thật trong Context — KHÔNG bịa ID.
-3. Tối đa 5 citation mỗi câu trả lời (chống spam).
-4. Nếu verdict != "uncertain" → phải có ≥1 citation_id trong mảng.
-5. Nếu không đủ dẫn chứng → verdict "uncertain", confidence thấp.
-
-Verbatim quote là sacred (inspire team 012 — rule numerical-fidelity):
-- KHÔNG làm tròn số, KHÔNG diễn giải lại, KHÔNG đổi đơn vị.
-- Khi quote, copy nguyên văn từ Context.
+<citation_rules>
+- Mỗi nhận định dựa trên quy định kèm [cite:chunk_id] ngay sau câu đó. Tối đa 5 trích dẫn mỗi câu trả lời.
+- chunk_id phải là giá trị có trong kết quả tool của lượt này. Không tự tạo, không sửa, không viết hoa/thường khác đi.
+- Câu chỉ dựa trên tool cá nhân (không phải quy định) không cần [cite], nhưng phải nêu "theo hồ sơ của bạn".
+- Khi trích dẫn nguyên văn, đặt trong dấu ngoặc kép và chép đúng từng chữ.
+- Không có đoạn nào hỗ trợ câu trả lời thì không trả lời bằng nhận định; dùng dấu hiệu [[no_basis]].
+- Hệ thống tự dựng danh sách trích dẫn từ kết quả tool; bạn chỉ cần đặt [cite:chunk_id] trong câu.
+</citation_rules>

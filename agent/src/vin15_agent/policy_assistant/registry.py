@@ -1,0 +1,20 @@
+"""Đăng ký tool theo vai trò: mọi vai trò có tool tra quy định; chỉ sinh viên có ``get_my_*`` (R5.7)."""
+
+from __future__ import annotations
+
+from vin15_agent.core.ai_client import AiClient
+from vin15_agent.core.tools import ToolRegistry
+from vin15_agent.policy_assistant.be_client import BeToolsClient
+from vin15_agent.policy_assistant.tools.get_policy_clause import GetPolicyClauseTool
+from vin15_agent.policy_assistant.tools.personal import build_personal_tools
+from vin15_agent.policy_assistant.tools.search_policy import SearchPolicyTool
+
+POLICY_TOOL_NAMES = frozenset({"search_policy", "get_policy_clause"})
+
+
+def build_registry(role: str, be: BeToolsClient, ai: AiClient) -> ToolRegistry:
+    registry = ToolRegistry([SearchPolicyTool(be, ai), GetPolicyClauseTool(be)])
+    if role == "student":
+        for tool in build_personal_tools(be):
+            registry.register(tool)
+    return registry

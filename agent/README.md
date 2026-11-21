@@ -4,14 +4,23 @@ Module **riêng**, chạy ở **cổng riêng** (mặc định `8100`). Backend 
 (`be/src/vin15/infrastructure/agent_api`). Hai bên **không import code của nhau** (có test kiểm: `tests/test_architecture.py`).
 
 ## Trạng thái
-Chỉ có khung: `GET /healthz` (không token) và `GET /v1/info` (cần token). Chưa có agent nào.
-Ba agent theo `docs/nghiep-vu-thuc-tap.md` mục 8: tác tử giám sát, trợ lý chính sách, tiền thẩm.
+Có: `GET /healthz` (không token), `GET /v1/info` (cần token), `POST /v1/embeddings` (cần token, cho BE nạp chunk) và
+**trợ lý chính sách** (`WS /v1/policy-assistant/ws`, cần token ở bắt tay). `core/ai_client.py` gọi LLM: OpenAI trực tiếp, proxy AiClient dự phòng
+(chat có tool, streaming, embedding; đường dự phòng khai báo khả năng qua `AICLIENT_CAPABILITIES`, mặc định chỉ chat thường).
+Chưa có: tác tử giám sát và tiền thẩm (hai agent còn lại trong `docs/nghiep-vu-thuc-tap.md` mục 8).
+Hợp đồng khung WebSocket: `.kiro/specs/agent-hoi-dap/contract.md`; bản mã: `policy_assistant/protocol.py`.
+
+Trợ lý chính sách (ReAct, mọi tool chỉ-đọc, gọi ngược BE `/api/agent-tools/*`): `search_policy`, `get_policy_clause` (mọi vai trò) và
+`get_my_*` (chỉ sinh viên, không tham số chủ thể). Hậu kiểm bằng code: trích dẫn `[cite:id]` ⊆ chunk đã thấy (≤ 5), số liệu phải có trong nguồn,
+viết lại cụm cam kết, che PII trước khi vào LLM/log, chế độ suy giảm (`degraded`) khi LLM sập.
 
 ## Chạy
 ```sh
 uv sync --extra dev
 uv run vin15-agent-api            # http://localhost:8100/healthz
 uv run pytest && uv run ruff check src tests
+make agent-llm-check              # gọi thử LLM một câu (từ gốc repo)
+make agent-eval ARGS="--persona sv_a"   # đánh giá bằng LLM THẬT + BE đã seed (tests/eval/cases.yaml); không chạy trong CI
 ```
 
 ## Cấu hình (`.env` ở gốc repo)
@@ -19,14 +28,22 @@ uv run pytest && uv run ruff check src tests
 |---|---|
 | `AGENT_API_PORT` | Cổng (mặc định 8100) |
 | `AGENT_API_SERVICE_TOKEN` | Token BE phải gửi. Phải khớp giá trị bên BE |
+| `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` | LLM chính (trống base URL = api.openai.com) |
+| `AICLIENT_BASE_URL`, `AICLIENT_API_KEY` | LLM dự phòng; trống base URL = tắt |
+| `AICLIENT_CAPABILITIES` | Khả năng đường dự phòng hỗ trợ (`tools,stream,embed`, cách nhau dấu phẩy); trống = chỉ chat thường |
+| `OPENAI_EMBEDDING_MODEL`, `ASSISTANT_TEMPERATURE` | Model embedding; nhiệt độ riêng của trợ lý (mặc định 0.2; model suy luận bỏ qua) |
+| `AGENT_MAX_ROUNDS`, `AGENT_MAX_TOOL_CALLS`, `AGENT_TURN_SECONDS` | Giới hạn mỗi lượt: vòng LLM (6), lần gọi tool (8), giây (25) |
+| `AGENT_TOOL_TIMEOUT_SECONDS`, `ASSISTANT_MAX_CONCURRENT_TURNS` | Hạn một lời gọi tool tới BE (8 s); số lượt đồng thời tối đa (50, vượt thì `error: busy`) |
+| `BE_API_URL` | Địa chỉ BE để agent gọi tool (cùng `AGENT_API_SERVICE_TOKEN`) |
+| `PII_STUDENT_ID_PATTERN`, `SCHOOL_NAME`, `ASSISTANT_SAMPLE_NOTICE`, `AGENT_PROMPTS_DIR` | Regex mã SV để che PII; tên trường trong prompt; cảnh báo quy chế mẫu; thư mục prompt |
 | `APP_ENV=production` | Bật kiểm tra token không dùng giá trị mặc định |
 
 ## Cấu trúc dự kiến
 ```
 src/vin15_agent/
   runtime/    điểm vào: HTTP app, nối các agent        (tầng trên cùng)
-  <agent>/    mỗi agent một gói: domain, features, adapters
-  core/       gọi LLM (proxy AiClient), prompt, bộ nhớ, tracing
+  <agent>/    mỗi agent một gói (policy_assistant: agent, be_client, tools/, verify, degraded, protocol)
+  core/       AiClient, tools, agent_loop, pii, prompts, tracing
   shared/     cấu hình, kiểu cơ bản                    (tầng dưới cùng)
 prompts/      prompt dạng file .md (không nhúng prompt dài trong Python)
 ```

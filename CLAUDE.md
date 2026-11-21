@@ -1,16 +1,26 @@
-# CLAUDE.md — Project context cho Claude Code (C4/C5)
-
-> Inspire team 001 (PROJECT_CONTEXT Quick Rehydrate) + team 008 (CLAUDE.md structure).
+# CLAUDE.md — Project context cho Claude Code
 
 ## Quick Rehydrate (≤ 60s)
 
 Đọc nhanh khi mất context:
-- **Đây là**: VIN-15 — hệ thống hỗ trợ thực tập bằng AI cho một trường (sản phẩm thật, đang làm lại nghiệp vụ từ đầu).
-- **Đề tài**: `docs/problem-statement.md`. Nghiệp vụ đã phân tích: `docs/nghiep-vu-thuc-tap.md` (bản nháp 0.1).
-- **Cấu trúc**: `be/` (FastAPI, cổng 8000) + `agent/` (service AI riêng, cổng 8100). Đọc `be/README.md`, `agent/README.md`.
-- **Stack**: Python 3.12, uv, FastAPI, Pydantic v2, Postgres (Supabase) qua psycopg, migration SQL kiểu Flyway.
-- **Chạy**: `make install`, `make be-run` (BE), `make agent-run` (agent). Test: `make test`. Lint: `make lint`.
-- **Cấu hình**: `.env` ở gốc repo (mẫu `.env.example`). BE không giữ khóa LLM, chỉ agent dùng.
+- **Đây là**: VIN-15 — hệ thống hỗ trợ thực tập bằng AI cho một trường (sản phẩm thật, đang làm lại nghiệp vụ từ đầu trên nhánh `konan`).
+- **Đề tài**: `docs/problem-statement.md` (không đổi). Nghiệp vụ đã phân tích: `docs/nghiep-vu-thuc-tap.md` (bản nháp 0.1, có mã BR-*, A*, P*).
+- **Cấu trúc**: `be/` (FastAPI, cổng 8000, gói `vin15`) + `agent/` (service AI riêng, cổng 8100, gói `vin15_agent`) + `fe/` (Next.js, cổng 3000). Đọc `be/README.md`, `agent/README.md`, `fe/README.md`.
+- **Stack**: Python 3.12, uv, FastAPI, Pydantic v2, Postgres (Supabase) qua psycopg, migration SQL kiểu Flyway, SDK `openai`; FE Next.js (App Router, TypeScript).
+- **Chạy** (không cần Docker): `scripts/start.sh` (BE + agent + FE cùng lúc, Ctrl+C dừng tất cả), hoặc riêng lẻ `make install`, `make be-run`, `make agent-run`, `make fe-run`. Test: `make test`. Lint: `make lint`.
+  Gọi thử LLM thật: `make agent-llm-check`.
+- **Cấu hình**: `.env` ở gốc repo (mẫu `.env.example`), cả `be/` và `agent/` cùng đọc. BE không giữ khóa LLM, chỉ agent dùng.
+- **Lịch sử thay đổi**: `docs/changes/` (đọc file mới nhất để biết việc vừa làm và phần còn dở).
+
+## Trạng thái hiện tại (cập nhật khi đổi)
+
+Mới có **khung**, chưa có tính năng nghiệp vụ nào:
+- **Có**: BE health + `GET /api/agent/health`; `Database` + `SqlMigrator`; token HS256; xử lý lỗi, rate limit; migration `V1__baseline`
+  (`app_user`, `audit_event` chỉ-thêm, RLS); agent `GET /healthz`, `GET /v1/info`; `AiClient` (OpenAI trực tiếp, proxy dự phòng);
+  FE `fe/` mới có một trang kiểm tra kết nối tới BE và agent (chưa có màn hình nghiệp vụ, chưa có đăng nhập).
+- **Chưa có** (thư mục/docstring rỗng): 15 gói `be/.../service/*` (trừ health), `domain/statemachine` (mới có README), auth/đăng nhập,
+  `infrastructure/{mail,oauth,storage}`, bảng nghiệp vụ, mọi agent thật (giám sát, trợ lý chính sách, tiền thẩm), che PII trước khi gửi LLM.
+- **Thứ tự làm dự kiến**: auth → state machine → luồng dọc đầu tiên (hồ sơ thực tập, đề cương) → agent.
 
 ## Current Invariants (để không drift)
 
@@ -19,16 +29,30 @@
 - **BE và agent chỉ nói chuyện qua HTTP** (`be/.../infrastructure/agent_api`, kèm service token). BE không import
   `vin15_agent`, agent không import `vin15`. Hai test `test_architecture.py` kiểm điều này.
 - **Hướng phụ thuộc trong BE**: `presentation → service → domain`, `infrastructure → domain`, `presentation` đi qua `Container`.
+- **FE gọi BE chỉ qua HTTP**: trình duyệt gọi `/api/...` cùng origin, Next `rewrites` (`fe/next.config.ts`) chuyển sang BE; FE không gọi agent trực tiếp (agent chỉ BE gọi, cần service token).
+- **Hướng phụ thuộc trong agent**: `runtime → <agent> → core → shared`. SDK `openai` chỉ được import trong `agent/src/vin15_agent/core/` (có test kiểm).
+- **LLM**: mọi lời gọi đi qua `AiClient` (`core/ai_client.py`). Đường chính là OpenAI trực tiếp (`OPENAI_*`); proxy `AiClient`
+  (`AICLIENT_*`) chỉ là dự phòng, chỉ dùng khi lỗi tạm thời (mất kết nối, timeout, 429, 5xx). Khóa là `SecretStr`, không log, không đưa vào prompt/commit.
 - **Agent không có công cụ quyết định**: không duyệt, chấp nhận, công nhận, ghi LMS. Quyền quyết định nằm ở BE (state machine).
 - **Mọi bảng mới phải bật RLS** (Supabase mở schema `public` qua khóa anon) — có test chặn.
+- **Migration đã áp dụng thì không sửa** (checksum lệch): thêm `V<n+1>__...sql` mới.
 - **Prompts**: nằm ở `agent/prompts/*.md` (external file, `{{placeholder}}`). KHÔNG nhúng prompt dài trong Python string.
 - **Ràng buộc đề tài** (chi tiết ở `docs/problem-statement.md`):
   - Phê duyệt đề cương thực tập, xử lý ngoại lệ, công nhận quy đổi tín chỉ BẮT BUỘC có
     giảng viên/quản trị viên phê duyệt (HITL) — agent không được tự quyết.
   - Câu trả lời về chính sách phải trích dẫn đúng văn bản quy định hiện hành.
   - Bảo mật thông tin sinh viên và doanh nghiệp (che PII trước khi gửi LLM ngoài).
-- **Logging hooks**: `.claude/.cursor/.codex/.gemini/.github` auto-log prompt vào
+- **Logging hooks**: `.claude/.cursor/.codex/.gemini/.agents/.github` auto-log prompt vào
   `.ai-log/`. KHÔNG disable, KHÔNG bypass `--no-verify`. Đừng dán khóa/mật khẩu vào prompt (sẽ bị ghi log).
+
+## Tài liệu và cấu hình còn của dự án cũ (KHÔNG tin)
+
+Các file sau mô tả app cũ (một app `src/`, SQLAlchemy/SQLite, LangGraph, SPA `web/`, `.kiro/`, `docs/PRD.md` — đều đã bỏ khỏi nhánh `konan`).
+Không dùng làm căn cứ; khi đụng tới thì cập nhật hoặc xóa:
+- `README.md`, `README_boilerplate.md`, `ARCHITECTURE.md`, `PROJECT_CONTEXT.md`, `presentation/`, `scripts/check_docs.py`, `scripts/llm_e2e.py`.
+- `deploy/` (Caddy, Keycloak, compose LLM) và `.github/workflows/cd-ec2.yml` (build từ Dockerfile gốc và `deploy/docker-compose.production.yml` không còn tồn tại).
+- `docs/guide/` là tài liệu khóa học (tham khảo chung), không phải đặc tả của dự án.
+- Docker (`be/Dockerfile`, `agent/Dockerfile`, `docker-compose.yml`) mới viết, chưa build thử; dev hằng ngày không dùng.
 
 ## Quy tắc viết tài liệu (docs)
 
@@ -40,6 +64,7 @@
   chưa kiểm tra hoặc còn lưu ý.
 - **Người dùng yêu cầu chỉnh sửa lại tính năng đã có tài liệu → SỬA file docs đó**, không tạo file
   `.md` mới cho cùng tính năng. Cập nhật nội dung cho khớp code; chỉ tạo file mới khi là tính năng khác.
+- Đổi cấu trúc hoặc trạng thái triển khai thì cập nhật mục "Trạng thái hiện tại" ở trên và README của `be/`/`agent/`.
 
 ## Quy tắc commit / PR
 
@@ -48,9 +73,12 @@
 - **Khi sửa theo review/CI (Auto-fix)**: chỉ sửa code, chạy kiểm tra, commit và push. **KHÔNG** đăng comment
   hay reply trên PR/thread review, và không cần resolve thread (kể cả dòng "Addressed by Claude Code").
   Giải thích gì thêm thì nói với người dùng trong phiên làm việc.
+- Chỉ commit/push khi người dùng yêu cầu. Không commit `.env` hay file chứa khóa.
 
 ## Quyết định kỹ thuật (ADR ngắn)
 
 - **Tách agent thành service riêng**: cổng riêng, vòng đời riêng, khóa LLM chỉ nằm ở agent → BE nhỏ, dễ kiểm, ranh giới HITL rõ.
 - **Postgres (Supabase) + migration SQL**: không dùng ORM; mỗi thực thể một repository, schema nằm trong `resources/db/migration`.
+  Kết nối qua Session pooler (IPv4); host trực tiếp `db.<ref>.supabase.co` chỉ có IPv6.
 - **Defence-in-depth cho HITL**: agent không được cấp công cụ quyết định, và state machine từ chối actor không phải người.
+- **LLM: OpenAI trực tiếp, proxy dự phòng**: không chuyển sang dự phòng khi lỗi khóa/yêu cầu (401/400) để không che lỗi cấu hình.

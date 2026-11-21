@@ -1,4 +1,7 @@
-"""Chạy migration trên Postgres thật (pgserver, nhúng sẵn, không cần Docker). Bỏ qua nếu không có pgserver."""
+"""Chạy migration nền tảng (V1) trên Postgres nhúng (pgserver, không cần Docker). Bỏ qua nếu không có pgserver.
+
+pgserver không kèm extension ``unaccent``/``btree_gist`` nên V2 trở đi được kiểm ở ``test_policy_schema_db.py`` trên Supabase.
+"""
 
 import shutil
 import tempfile
@@ -22,6 +25,15 @@ def uri():
 
 
 @pytest.fixture
+def v1_dir(tmp_path):
+    """Thư mục chỉ có V1 (baseline)."""
+    directory = tmp_path / "v1"
+    directory.mkdir()
+    shutil.copy(MIGRATION_DIR / "V1__baseline.sql", directory)
+    return directory
+
+
+@pytest.fixture
 def db(uri):
     """Mỗi test một schema sạch: dọn các bảng của VIN-15 trước khi chạy."""
     with psycopg.connect(uri, autocommit=True) as conn:
@@ -33,23 +45,23 @@ def db(uri):
     database.close()
 
 
-def test_applies_baseline_once_and_is_idempotent(db):
-    assert SqlMigrator(db).migrate() == [1]
-    assert SqlMigrator(db).migrate() == []
+def test_applies_baseline_once_and_is_idempotent(db, v1_dir):
+    assert SqlMigrator(db, v1_dir).migrate() == [1]
+    assert SqlMigrator(db, v1_dir).migrate() == []
     with db.connection() as conn:
         assert [r["version"] for r in conn.execute("select version from schema_history")] == [1]
         assert db.ping()
 
 
-def test_row_level_security_is_on(db):
-    SqlMigrator(db).migrate()
+def test_row_level_security_is_on(db, v1_dir):
+    SqlMigrator(db, v1_dir).migrate()
     with db.connection() as conn:
         rows = conn.execute("select relname, relrowsecurity from pg_class where relname in ('app_user', 'audit_event')").fetchall()
     assert {r["relname"]: r["relrowsecurity"] for r in rows} == {"app_user": True, "audit_event": True}
 
 
-def test_audit_event_cannot_be_updated_or_deleted(db):
-    SqlMigrator(db).migrate()
+def test_audit_event_cannot_be_updated_or_deleted(db, v1_dir):
+    SqlMigrator(db, v1_dir).migrate()
     with db.connection() as conn:
         conn.execute("insert into audit_event (actor_kind, entity, action) values ('human', 'internship', 'submit')")
     for statement in ("update audit_event set action = 'x'", "delete from audit_event"):
@@ -57,8 +69,8 @@ def test_audit_event_cannot_be_updated_or_deleted(db):
             conn.execute(statement)
 
 
-def test_user_constraints(db):
-    SqlMigrator(db).migrate()
+def test_user_constraints(db, v1_dir):
+    SqlMigrator(db, v1_dir).migrate()
     insert = "insert into app_user (email, role) values (%s, %s)"
     with db.connection() as conn:
         conn.execute(insert, ("sv@truong.edu.vn", "student"))
@@ -70,23 +82,21 @@ def test_user_constraints(db):
         conn.execute(insert, ("x@truong.edu.vn", "hacker"))
 
 
-def test_edited_migration_is_detected(db, tmp_path):
-    shutil.copytree(MIGRATION_DIR, tmp_path / "m")
-    migrator = SqlMigrator(db, tmp_path / "m")
+def test_edited_migration_is_detected(db, v1_dir):
+    migrator = SqlMigrator(db, v1_dir)
     migrator.migrate()
-    baseline = tmp_path / "m" / "V1__baseline.sql"
+    baseline = v1_dir / "V1__baseline.sql"
     baseline.write_text(baseline.read_text(encoding="utf-8") + "\n-- đã sửa\n", encoding="utf-8")
     with pytest.raises(MigrationError, match="đã bị sửa"):
         migrator.migrate()
 
 
-def test_app_startup_migrates_and_reports_database_up(uri, db):
+def test_app_startup_reports_database_up(uri, db, v1_dir):
     from fastapi.testclient import TestClient
 
     from tests.conftest import make_settings
     from vin15.main import create_app
 
-    with TestClient(create_app(make_settings(database_url=uri))) as client:
+    SqlMigrator(db, v1_dir).migrate()
+    with TestClient(create_app(make_settings(database_url=uri, migrations_enabled=False))) as client:
         assert client.get("/api/health/readiness").json() == {"status": "UP", "components": {"database": "UP"}}
-    with db.connection() as conn:
-        assert conn.execute("select count(*) as n from schema_history").fetchone()["n"] == 1

@@ -11,6 +11,7 @@ from vin15.domain.exception import (
     AgentUnavailableError,
     AuthenticationRequiredError,
     DatabaseUnavailableError,
+    InvalidInputError,
     PermissionDeniedError,
     ResourceNotFoundError,
     StateConflictError,
@@ -23,6 +24,7 @@ _STATUS: dict[type[Exception], tuple[int, str]] = {
     PermissionDeniedError: (403, "permission_denied"),
     ResourceNotFoundError: (404, "not_found"),
     StateConflictError: (409, "conflict"),
+    InvalidInputError: (422, "invalid_input"),
     AgentUnavailableError: (503, "agent_unavailable"),
     DatabaseUnavailableError: (503, "database_unavailable"),
 }

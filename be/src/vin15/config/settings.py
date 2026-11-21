@@ -86,6 +86,28 @@ class Settings(BaseSettings):
     agent_api_url: str = ""
     agent_api_service_token: str = _DEV_AGENT_TOKEN
     agent_api_timeout_seconds: float = 10.0
+    #: Thời gian tối đa agent dành cho một lượt hỏi (cùng biến với agent). BE chờ thêm ``ASSISTANT_TURN_GRACE_SECONDS``.
+    agent_turn_seconds: float = 25.0
+
+    # ---- Trợ lý hỏi đáp chính sách ----
+    #: Ngưỡng độ tương đồng vector tối thiểu τ: dưới ngưỡng và không có kết quả từ khóa thì ``no_match``.
+    policy_no_match_threshold: float = 0.25
+    #: CHỈ DEV: chủ thể của tool agent khi request không có agent-token. ``validate_production()`` từ chối khi đặt ở production.
+    agent_dev_default_user_email: str = ""
+    assistant_ask_per_minute: int = 10
+    assistant_max_connections_per_user: int = 3
+    assistant_max_frame_bytes: int = 65536
+    #: Số lượt (một lượt = câu hỏi + câu trả lời) gần nhất gửi cho agent làm lịch sử.
+    assistant_history_turns: int = 6
+    assistant_ws_auth_seconds: float = 5.0
+    assistant_question_max_chars: int = 2000
+    assistant_turn_grace_seconds: float = 20.0
+    #: Regex mã sinh viên để che PII ở lịch sử/audit (trống = không che theo mã). Cùng biến với agent.
+    pii_student_id_pattern: str = ""
+
+    # ---- Ngưỡng điều kiện công nhận tín chỉ (bản mẫu, khớp bộ quy chế mẫu; thay bằng quy chế thật) ----
+    credit_min_weeks: int = 8
+    credit_min_journal_ratio: float = 0.8
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -94,6 +116,16 @@ class Settings(BaseSettings):
     @property
     def admin_email_list(self) -> list[str]:
         return [item.strip().lower() for item in self.app_admin_emails.split(",") if item.strip()]
+
+    @property
+    def dev_default_user_email(self) -> str:
+        """Email người dùng mặc định cho tool agent; rỗng nếu không đặt hoặc đang ở production (không bao giờ hiệu lực ở production)."""
+        return "" if self.is_production else self.agent_dev_default_user_email.strip().lower()
+
+    @property
+    def agent_ws_url(self) -> str:
+        base = self.agent_api_url.strip().rstrip("/")
+        return ("ws" + base[4:] if base.startswith("http") else base) + "/v1/policy-assistant/ws" if base else ""
 
     @property
     def has_database(self) -> bool:
@@ -118,6 +150,8 @@ class Settings(BaseSettings):
             issues.append("AGENT_API_SERVICE_TOKEN phải đổi khỏi giá trị mặc định")
         if not self.admin_email_list:
             issues.append("APP_ADMIN_EMAILS phải có ít nhất một email quản trị viên khởi tạo")
+        if self.agent_dev_default_user_email.strip():
+            issues.append("AGENT_DEV_DEFAULT_USER_EMAIL chỉ dùng cho dev: phải để trống khi APP_ENV=production")
         return issues
 
 

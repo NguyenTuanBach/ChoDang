@@ -20,6 +20,8 @@ dependencies = [
     "python-dotenv>=1.0",
     # Cơ sở dữ liệu múi giờ cho ``zoneinfo``: ảnh Docker slim không có sẵn.
     "tzdata>=2024.1",
+    # WebSocket client tới agent (httpx không hỗ trợ WebSocket). Đã có sẵn qua uvicorn[standard], ghi rõ để không phụ thuộc ngầm.
+    "websockets>=13",
 ]
 
 [project.scripts]
@@ -37,7 +39,8 @@ vin15 = ["resources/**/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra"
+addopts = "-ra -m \"not e2e\""
+markers = ["e2e: BE + agent thật qua tiến trình, LLM giả, cần Postgres (make e2e)"]
 
 [tool.ruff]
 line-length = 140

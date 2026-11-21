@@ -56,3 +56,30 @@ def test_revoked_token_is_rejected():
 def test_garbage_is_rejected():
     with pytest.raises(AuthenticationRequiredError):
         service().decode("khong-phai-token")
+
+
+def test_agent_token_carries_scope_and_extra_claims():
+    s = service()
+    token = s.create(5, "student", 5, scope="agent_tools", extra={"conv": "c1", "turn": "t1", "sub": 999})
+    claims = s.decode(token, scope="agent_tools")
+    assert claims["scope"] == "agent_tools" and claims["conv"] == "c1" and claims["turn"] == "t1"
+    assert claims["sub"] == 5  # claim phụ không ghi đè được chủ thể
+
+
+def test_agent_token_is_rejected_by_regular_api():
+    s = service()
+    token = s.create(5, "student", 5, scope="agent_tools")
+    with pytest.raises(AuthenticationRequiredError, match="không dùng được"):
+        s.decode(token)
+
+
+def test_session_token_is_rejected_for_agent_tools():
+    s = service()
+    with pytest.raises(AuthenticationRequiredError, match="không dùng được"):
+        s.decode(s.create(5, "student"), scope="agent_tools")
+
+
+def test_wrong_scope_is_rejected():
+    s = service()
+    with pytest.raises(AuthenticationRequiredError):
+        s.decode(s.create(5, "student", scope="other"), scope="agent_tools")

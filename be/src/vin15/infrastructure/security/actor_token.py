@@ -1,6 +1,9 @@
 """Token phiên HS256 chỉ dùng stdlib (hmac). Chỉ hỗ trợ HS256 + ``exp`` nên không có lỗi ``alg=none``.
 
 Đăng nhập thật dùng Google OAuth; sau khi xác minh email đã mời, BE cấp token này cho trình duyệt.
+
+Token có thể mang claim ``scope`` (ví dụ ``agent_tools`` cho agent-token sống ngắn). Token có scope **không** dùng được ở nơi
+đòi token thường và ngược lại: ``decode(token, scope=...)`` phải khớp đúng phạm vi.
 """
 
 from __future__ import annotations
@@ -34,13 +37,21 @@ class ActorTokenService:
     def _sign(self, message: bytes) -> str:
         return _b64(hmac.new(self._secret, message, hashlib.sha256).digest())
 
-    def create(self, user_id: int, role: str, ttl_minutes: int | None = None) -> str:
+    def create(
+        self, user_id: int, role: str, ttl_minutes: int | None = None, *, scope: str | None = None, extra: dict | None = None
+    ) -> str:
+        """``scope``: phạm vi của token (None = token phiên thường). ``extra``: claim thêm, không được ghi đè claim chuẩn."""
         ttl = self._ttl_minutes if ttl_minutes is None else ttl_minutes
         header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-        payload = _b64(json.dumps({"sub": user_id, "role": role, "jti": secrets.token_urlsafe(16), "exp": int(time.time()) + ttl * 60}).encode())
+        claims = dict(extra or {})
+        claims.update({"sub": user_id, "role": role, "jti": secrets.token_urlsafe(16), "exp": int(time.time()) + ttl * 60})
+        if scope is not None:
+            claims["scope"] = scope
+        payload = _b64(json.dumps(claims).encode())
         return f"{header}.{payload}.{self._sign(f'{header}.{payload}'.encode())}"
 
-    def decode(self, token: str) -> dict:
+    def decode(self, token: str, *, scope: str | None = None) -> dict:
+        """Giải mã và kiểm chữ ký, hạn. ``scope`` phải khớp claim ``scope`` của token (None = token thường, không có scope)."""
         try:
             header, payload, signature = token.split(".")
             alg = json.loads(_unb64(header)).get("alg")
@@ -59,6 +70,8 @@ class ActorTokenService:
             raise AuthenticationRequiredError("Token sai định dạng") from exc
         if claims.get("exp", 0) < time.time():
             raise AuthenticationRequiredError("Token đã hết hạn")
+        if claims.get("scope") != scope:
+            raise AuthenticationRequiredError("Token không dùng được cho chức năng này")
         return claims
 
     def revoke(self, token: str) -> None:

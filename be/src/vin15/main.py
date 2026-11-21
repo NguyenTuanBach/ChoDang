@@ -15,7 +15,13 @@ from .config.cors_config import configure_cors
 from .config.settings import Settings, get_settings
 from .infrastructure.persistence.migrations import SqlMigrator
 from .presentation.advice.global_exception_handler import register_exception_handlers
-from .presentation.controller import agent_controller, health_controller
+from .presentation.controller import (
+    agent_controller,
+    agent_tools_controller,
+    assistant_controller,
+    health_controller,
+    policy_admin_controller,
+)
 from .presentation.rate_limit import RateLimitMiddleware, Rule
 
 log = logging.getLogger("vin15")
@@ -53,10 +59,21 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     )
     app.state.container = container
     configure_cors(app, settings)
-    app.add_middleware(RateLimitMiddleware, rules=[Rule("/api/auth/", limit=30), Rule("/api/invitations", limit=30)])
+    app.add_middleware(
+        RateLimitMiddleware,
+        rules=[
+            Rule("/api/auth/", limit=30),
+            Rule("/api/invitations", limit=30),
+            # WebSocket không đi qua middleware này: giới hạn ask/kết nối nằm trong handler. Vé thì giới hạn ở đây.
+            Rule("/api/assistant/ws-ticket", limit=30),
+        ],
+    )
     register_exception_handlers(app)
     app.include_router(health_controller.router)
     app.include_router(agent_controller.router)
+    app.include_router(agent_tools_controller.router)
+    app.include_router(assistant_controller.router)
+    app.include_router(policy_admin_controller.router)
     return app
 
 

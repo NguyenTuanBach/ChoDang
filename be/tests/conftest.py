@@ -33,3 +33,9 @@ def client_with_agent(handler, **overrides) -> TestClient:
     container = Container(settings)
     container.agent_client._transport = agent_transport(handler)
     return TestClient(create_app(settings, container))
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    """Test async dùng plugin anyio, chỉ chạy với asyncio (không cài trio)."""
+    return "asyncio"

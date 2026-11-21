@@ -48,3 +48,22 @@ def test_layers_respect_dependency_direction():
                 if parts[0] == "vin15" and len(parts) > 1 and parts[1] in banned:
                     offenders.append(f"{path.relative_to(SRC)} -> {name}")
     assert not offenders, offenders
+
+
+def test_dev_tools_are_never_imported_by_application_code():
+    """``vin15.devtools`` (seed dữ liệu giả) chỉ chạy bằng script, không được nối vào code chạy thật."""
+    offenders = [
+        f"{path.relative_to(SRC)} -> {name}"
+        for path in ROOT.rglob("*.py")
+        if "devtools" not in path.relative_to(ROOT).parts
+        for name in imports_of(path)
+        if name == "vin15.devtools" or name.startswith("vin15.devtools.")
+    ]
+    assert not offenders, offenders
+
+
+def test_agent_tools_have_no_write_dependencies():
+    """Tool agent chỉ-đọc: service của tool không được import service/repo ghi (ingest, publish, chat)."""
+    path = ROOT / "service" / "agent" / "agent_tool_service.py"
+    banned = ("policy_ingest_service", "policy_publish_service", "chat_repository", "assistant_orchestrator")
+    assert not [n for n in imports_of(path) if any(b in n for b in banned)]
