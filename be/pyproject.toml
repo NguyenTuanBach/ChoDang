@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vin15-be"
+version = "0.1.0"
+description = "VIN-15 backend: hệ thống hỗ trợ thực tập bằng AI"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "httpx>=0.27",
+    # Postgres (Supabase). Bản binary đã kèm libpq nên ảnh Docker slim không cần cài thêm.
+    "psycopg[binary]>=3.2",
+    "psycopg-pool>=3.2",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0",
+    # Cơ sở dữ liệu múi giờ cho ``zoneinfo``: ảnh Docker slim không có sẵn.
+    "tzdata>=2024.1",
+]
+
+[project.scripts]
+vin15-backend = "vin15.main:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5", "pgserver>=0.1.4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+vin15 = ["resources/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008"]

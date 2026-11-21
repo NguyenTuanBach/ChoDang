@@ -1,60 +1,63 @@
+# Hai service chạy RIÊNG, cổng riêng: backend :8000 và agent-api :8100. Database là Supabase (ngoài compose).
+# Cấu hình lấy từ .env ở gốc repo (cp .env.example .env).
 services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: vin15
-      POSTGRES_PASSWORD: vin15
-      POSTGRES_DB: vin15
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vin15 -d vin15"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   backend:
+    image: vin15/backend:local
     build:
-      context: .
-      dockerfile: Dockerfile
-    # Chỉ mở cho máy local (debug, /docs, test UI). Người dùng đi qua Caddy HTTPS ở cổng 443.
-    ports:
-      - "127.0.0.1:8000:8000"
+      context: ./be
     env_file:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgresql://vin15:vin15@db:5432/vin15
-      UPLOAD_DIR: /app/data/uploads
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./data:/app/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  proxy:
-    image: caddy:2.8.4-alpine
+      APP_HOST: 0.0.0.0
+      APP_PORT: "8000"
+      # Gọi agent bằng tên service trên mạng nội bộ của compose.
+      AGENT_API_URL: http://agent-api:8100
+      AGENT_API_SERVICE_TOKEN: ${AGENT_API_SERVICE_TOKEN:-agent-api-local-only}
+      # Khóa LLM chỉ thuộc về agent. .env nạp qua env_file nên xóa trắng ở đây.
+      OPENAI_API_KEY: ""
     ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
-      DEFAULT_SNI: ${DEFAULT_SNI:-localhost}
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    # Hệ thống file chỉ đọc, bỏ mọi capability, cấm leo quyền. Chỗ cần ghi là tmpfs.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     depends_on:
-      - backend
+      agent-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     restart: unless-stopped
 
-volumes:
-  pgdata:
-  caddy_data:
-  caddy_config:
+  agent-api:
+    image: vin15/agent:local
+    build:
+      context: ./agent
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AGENT_API_HOST: 0.0.0.0
+      AGENT_API_PORT: "8100"
+      AGENT_API_SERVICE_TOKEN: ${AGENT_API_SERVICE_TOKEN:-agent-api-local-only}
+    # Chỉ để debug trên máy local; BE gọi qua http://agent-api:8100 trong mạng nội bộ.
+    ports:
+      - "127.0.0.1:${AGENT_API_PORT:-8100}:8100"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped

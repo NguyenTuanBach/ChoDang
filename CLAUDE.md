@@ -5,33 +5,30 @@
 ## Quick Rehydrate (≤ 60s)
 
 Đọc nhanh khi mất context:
-- **Đây là**: AI20K Agent Template — starter code cho học viên VinUni build AI Agent.
-- **Đề tài**: Hệ thống hỗ trợ thực tập bằng AI — xem `docs/problem-statement.md`.
-- **Stack**: Python 3.12, FastAPI, LangGraph 1.x, LangChain 1.x, Pydantic v2.
-- **Mock-first**: agent chạy được KHÔNG cần OPENAI_API_KEY (xem `src/services/llm.py`).
-- **Chạy server**: `uvicorn src.main:app --reload` → http://localhost:8000/docs
-- **Chạy test**: `pytest tests/ -v`
-- **Chạy eval**: `python eval/run_eval.py`
+- **Đây là**: VIN-15 — hệ thống hỗ trợ thực tập bằng AI cho một trường (sản phẩm thật, đang làm lại nghiệp vụ từ đầu).
+- **Đề tài**: `docs/problem-statement.md`. Nghiệp vụ đã phân tích: `docs/nghiep-vu-thuc-tap.md` (bản nháp 0.1).
+- **Cấu trúc**: `be/` (FastAPI, cổng 8000) + `agent/` (service AI riêng, cổng 8100). Đọc `be/README.md`, `agent/README.md`.
+- **Stack**: Python 3.12, uv, FastAPI, Pydantic v2, Postgres (Supabase) qua psycopg, migration SQL kiểu Flyway.
+- **Chạy**: `make install`, `make be-run` (BE), `make agent-run` (agent). Test: `make test`. Lint: `make lint`.
+- **Cấu hình**: `.env` ở gốc repo (mẫu `.env.example`). BE không giữ khóa LLM, chỉ agent dùng.
 
 ## Current Invariants (để không drift)
 
-- **Source of truth kỹ thuật**: code trong `src/`. File `.md` (kể cả file này) chỉ là
-  tóm tắt — khi mâu thuẫn, CODE WINS (inspire team 011 source-of-truth rule).
-- **Agent graph**: `src/agents/graph.py` — ReAct harness loop: guardrail → reason → act
-  (tools, HITL interrupt cho risky tools) → assess → finalize (escape hatch max-iterations).
-  Pattern pipeline thay thế: safety → retrieve → synthesize → validate (nodes/ còn lại,
-  dùng khi cần RAG pipeline tuyến tính thay vì ReAct loop). Đừng thêm node mà không cập nhật state schema.
-- **Prompts**: nằm ở `prompts/*.md` (external file, `{{placeholder}}`). KHÔNG nhúng
-  prompt dài trong Python string.
-- **Safety guardrail**: DANGER_KEYWORDS ở `nodes/safety_node.py`. Domain-specific →
-  team phải cập nhật theo app của mình.
+- **Source of truth kỹ thuật**: code trong `be/src/` và `agent/src/`. File `.md` (kể cả file này) chỉ là
+  tóm tắt — khi mâu thuẫn, CODE WINS.
+- **BE và agent chỉ nói chuyện qua HTTP** (`be/.../infrastructure/agent_api`, kèm service token). BE không import
+  `vin15_agent`, agent không import `vin15`. Hai test `test_architecture.py` kiểm điều này.
+- **Hướng phụ thuộc trong BE**: `presentation → service → domain`, `infrastructure → domain`, `presentation` đi qua `Container`.
+- **Agent không có công cụ quyết định**: không duyệt, chấp nhận, công nhận, ghi LMS. Quyền quyết định nằm ở BE (state machine).
+- **Mọi bảng mới phải bật RLS** (Supabase mở schema `public` qua khóa anon) — có test chặn.
+- **Prompts**: nằm ở `agent/prompts/*.md` (external file, `{{placeholder}}`). KHÔNG nhúng prompt dài trong Python string.
 - **Ràng buộc đề tài** (chi tiết ở `docs/problem-statement.md`):
   - Phê duyệt đề cương thực tập, xử lý ngoại lệ, công nhận quy đổi tín chỉ BẮT BUỘC có
     giảng viên/quản trị viên phê duyệt (HITL) — agent không được tự quyết.
   - Câu trả lời về chính sách phải trích dẫn đúng văn bản quy định hiện hành.
-  - Bảo mật thông tin sinh viên và doanh nghiệp.
+  - Bảo mật thông tin sinh viên và doanh nghiệp (che PII trước khi gửi LLM ngoài).
 - **Logging hooks**: `.claude/.cursor/.codex/.gemini/.github` auto-log prompt vào
-  `.ai-log/`. KHÔNG disable, KHÔNG bypass `--no-verify`.
+  `.ai-log/`. KHÔNG disable, KHÔNG bypass `--no-verify`. Đừng dán khóa/mật khẩu vào prompt (sẽ bị ghi log).
 
 ## Quy tắc viết tài liệu (docs)
 
@@ -52,14 +49,8 @@
   hay reply trên PR/thread review, và không cần resolve thread (kể cả dòng "Addressed by Claude Code").
   Giải thích gì thêm thì nói với người dùng trong phiên làm việc.
 
-## Commands hay dùng
-
-Slash commands (Claude Code): `/feature`, `/eval` (xem `.claude/commands/`).
-
 ## Quyết định kỹ thuật (ADR ngắn)
 
-- **Mock-first LLM**: để template chạy được ngay khi clone → giảm friction sinh viên.
-- **External prompt files**: tách prompt khỏi code → mentor review được, diff rõ.
-- **Defence-in-depth safety**: guardrail ở cả prompt (safeguards.md) LẪN code
-  (safety_node) → chống jailbreak bỏ qua 1 lớp.
-- **Retry loop trong graph**: dùng conditional edge thay vì try/except đệ quy.
+- **Tách agent thành service riêng**: cổng riêng, vòng đời riêng, khóa LLM chỉ nằm ở agent → BE nhỏ, dễ kiểm, ranh giới HITL rõ.
+- **Postgres (Supabase) + migration SQL**: không dùng ORM; mỗi thực thể một repository, schema nằm trong `resources/db/migration`.
+- **Defence-in-depth cho HITL**: agent không được cấp công cụ quyết định, và state machine từ chối actor không phải người.

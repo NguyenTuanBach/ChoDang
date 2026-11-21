@@ -1,32 +1,50 @@
-.PHONY: run test lint format typecheck eval check clean
+.PHONY: install be-run be-test be-lint be-fmt agent-run agent-test agent-lint test lint check up down logs config clean
 
-run:
-	uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+# Python 3.12 + uv. Chạy từ gốc repo.
+install:
+	cd be && uv sync --extra dev
+	cd agent && uv sync --extra dev
 
-test:
-	pytest tests/ -v
+# ---- Backend (cổng 8000) ----
+be-run:
+	cd be && uv run python -m vin15
 
-# Eval regression — chạy agent qua golden dataset, judge tách generator,
-# xuất eval/results/report.md (good practice #8/#9: team 002 + 008).
-# Không cần API key (offline stub mode); có key là chạy LLM thật.
-eval:
-	python3 eval/run_eval.py
+be-test:
+	cd be && uv run pytest
 
-eval-strict:
-	python3 eval/run_eval.py --strict
+be-lint:
+	cd be && uv run ruff check src tests
 
-lint:
-	ruff check src/ tests/
+be-fmt:
+	cd be && uv run ruff format src tests
 
-format:
-	ruff format src/ tests/
+# ---- Agent (cổng 8100) ----
+agent-run:
+	cd agent && uv run vin15-agent-api
 
-typecheck:
-	mypy src/
+agent-test:
+	cd agent && uv run pytest
 
-check: lint format test
+agent-lint:
+	cd agent && uv run ruff check src tests
+
+# ---- Cả hai ----
+test: be-test agent-test
+lint: be-lint agent-lint
+check: lint test
+
+# ---- Docker (cp .env.example .env trước) ----
+config:
+	docker compose config -q
+
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down
+
+logs:
+	docker compose logs -f
 
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type d -name .pytest_cache -exec rm -rf {} +
-	find . -type d -name .ruff_cache -exec rm -rf {} +
+	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -not -path "*/.venv/*" -prune -exec rm -rf {} +
