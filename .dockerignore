@@ -1,0 +1,26 @@
+.git
+.gitignore
+.env
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.ai-log
+.kiro
+data/
+docs/
+presentation/
+eval/
+*.md
+!requirements.txt
+# Prompt và văn bản quy định mẫu là dữ liệu runtime — phải có trong image
+!prompts/*.md
+!seed/policies/*.md
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# FE React: node_modules/dist build lại trong image (stage frontend)
+frontend/node_modules
+frontend/dist

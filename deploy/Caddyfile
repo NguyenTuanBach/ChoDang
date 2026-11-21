@@ -1,0 +1,45 @@
+# Reverse proxy TLS cho VIN-15 (R15.1).
+# SITE_ADDRESS=localhost (mặc định) → Caddy tự cấp chứng chỉ từ CA nội bộ (trình duyệt sẽ cảnh báo
+# cho tới khi tin CA của Caddy). Đặt SITE_ADDRESS=ten-mien.edu.vn → Caddy xin chứng chỉ Let's Encrypt.
+# HTTP (cổng 80) được Caddy tự chuyển hướng sang HTTPS.
+# Truy cập bằng IP LAN (máy khác trong mạng): SITE_ADDRESS="localhost, 192.168.x.y" và DEFAULT_SNI=192.168.x.y
+# — trình duyệt không gửi SNI khi URL là địa chỉ IP, thiếu default_sni thì bắt tay TLS thất bại.
+{
+	default_sni {$DEFAULT_SNI:localhost}
+}
+
+{$SITE_ADDRESS:localhost} {
+	# Chỉ thị tls tạo connection policy để default_sni có hiệu lực (thiếu nó Caddy bỏ qua default_sni);
+	# không chỉ định issuer → tên miền thật vẫn lấy chứng chỉ Let's Encrypt.
+	tls {
+		protocols tls1.2 tls1.3
+	}
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# File minh chứng (link ký) được nhúng vào cửa sổ xem trên chính trang → cho phép frame cùng origin.
+	# Chỉ PDF/ảnh được trả inline (progress_routes.download); file không được chạy script của trang.
+	@files path /api/v1/files/*
+	header @files {
+		Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'self'"
+		X-Frame-Options "SAMEORIGIN"
+	}
+
+	@app not path /api/v1/files/*
+	header @app {
+		# Script chỉ từ chính trang (không inline); style của trang + font Lexend từ Google Fonts (FE React)
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		X-Frame-Options "DENY"
+	}
+
+	# SSE (trợ lý streaming) — không gom buffer
+	reverse_proxy backend:8000 {
+		flush_interval -1
+	}
+}
