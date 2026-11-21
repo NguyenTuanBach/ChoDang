@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AuthGate from "./AuthGate";
 
 const replace = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }), usePathname: () => "/student" }));
 
 const USER = { id: "3", email: "sv.a@example.test", full_name: "Sinh viên A (mẫu)", role: "student" };
 

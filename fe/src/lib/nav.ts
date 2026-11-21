@@ -30,6 +30,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { href: "/admin/internships", label: "Hồ sơ" },
     { href: "/admin/requests", label: "Yêu cầu" },
     { href: "/admin/config", label: "Cấu hình" },
+    { href: "/admin/policies", label: "Quy định" },
     { href: "/admin/lms", label: "LMS" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/admin/audit", label: "Audit" },

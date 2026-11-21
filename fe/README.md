@@ -28,7 +28,7 @@ Hoặc chạy cả BE, agent và FE bằng `scripts/start.sh` ở gốc repo.
 - Quản trị viên `/admin/*`: hàng chờ, tài khoản (mời GV/SV, gán GV phụ trách, mã SV), hồ sơ, yêu cầu ảnh hưởng tín chỉ, phê duyệt tín chỉ, cấu hình (mốc mẫu, chuẩn đầu ra,
   loại ngoại lệ), LMS (học phần, tiên quyết, điểm, đồng bộ), audit. Dùng chung: `/dashboard`, `/notifications`, `/assistant`.
 - Gọi API: `src/lib/http.ts` (`api`, `send`, `upload`), hook `useApi`/`useAction` (`src/lib/hooks.ts`), kiểu dữ liệu `src/lib/types.ts`, nhãn `src/lib/labels.ts`,
-  thành phần dùng chung `src/components/ui/ui.tsx` (CSS Modules, không thư viện UI). Bước nhập lý do bắt buộc dùng `DecisionPanel` (BR-S2).
+  thành phần dùng chung `src/components/ui/ui.tsx` (Tailwind CSS v4; màu trạng thái thống nhất: xanh = xong, vàng = chờ người khác, cam = cần bạn làm, đỏ = quá hạn/bị chặn, xám = chưa tới). `src/app/globals.css` giữ biến màu và kiểu nền cho thẻ nhập thô; chỉ `components/assistant/*` còn dùng CSS Modules. Bước nhập lý do bắt buộc dùng `DecisionPanel` (BR-S2).
 
 ## Trợ lý hỏi đáp (`/assistant`)
 - Mã: `src/lib/assistant/` (`reducer.ts` trạng thái theo `turn_id`, `useAssistant.ts` hook WebSocket, `client.ts` ticket/REST/URL WS,

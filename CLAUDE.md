@@ -6,7 +6,7 @@
 - **Đây là**: VIN-15 — hệ thống hỗ trợ thực tập bằng AI cho một trường (sản phẩm thật, đang làm lại nghiệp vụ từ đầu trên nhánh `konan`).
 - **Đề tài**: `docs/problem-statement.md` (không đổi). Nghiệp vụ đã phân tích: `docs/nghiep-vu-thuc-tap.md` (bản nháp 0.1, có mã BR-*, A*, P*).
 - **Cấu trúc**: `be/` (FastAPI, cổng 8000, gói `vin15`) + `agent/` (service AI riêng, cổng 8100, gói `vin15_agent`) + `fe/` (Next.js, cổng 3000). Đọc `be/README.md`, `agent/README.md`, `fe/README.md`.
-- **Stack**: Python 3.12, uv, FastAPI, Pydantic v2, Postgres (Supabase) qua psycopg, migration SQL kiểu Flyway, SDK `openai`; FE Next.js (App Router, TypeScript).
+- **Stack**: Python 3.12, uv, FastAPI, Pydantic v2, Postgres (Supabase) qua psycopg, migration SQL kiểu Flyway, SDK `openai`; FE Next.js (App Router, TypeScript, Tailwind CSS v4).
 - **Chạy** (không cần Docker): `scripts/start.sh` (BE + agent + FE cùng lúc, Ctrl+C dừng tất cả), hoặc riêng lẻ `make install`, `make be-run`, `make agent-run`, `make fe-run`. Test: `make test`. Lint: `make lint`.
   Gọi thử LLM thật: `make agent-llm-check`.
 - **Cấu hình**: `.env` ở gốc repo (mẫu `.env.example`), cả `be/` và `agent/` cùng đọc. BE không giữ khóa LLM, chỉ agent dùng.
@@ -23,10 +23,13 @@ Có **khung** và **một tính năng đầu tiên: Trợ lý chính sách** (k�
 - **Có thêm (nghiệp vụ thực tập, xem `docs/changes/20261121-nghiep-vu-thuc-tap.md`)**: state machine (`domain/statemachine`), phân quyền theo vai trò và phạm vi,
   mời tài khoản + Google OAuth, hồ sơ (AI gợi ý trường), đề cương, mốc/nhật ký/minh chứng (R2), gia hạn/ngoại lệ, thẩm định → phê duyệt tín chỉ, **LMS mini** (`infrastructure/lms`, sau `LmsPort`),
   dashboard + CSV + audit, thông báo + email, job nền, giám sát + tiền thẩm (agent một-lượt không công cụ ghi), FE theo vai trò (`/student`, `/lecturer`, `/admin`). Migration `V5`–`V10`.
-- **Chưa kiểm tra**: toàn bộ code của đợt nghiệp vụ trên **chưa được chạy** (chưa có test cho phần mới, `pytest`/`vitest`/lint chưa chạy); cần smoke test và sửa lỗi nhỏ.
-- **Chưa có**: trang FE quản trị văn bản quy định, danh sách thu hồi token bền (đang ở RAM), adapter LMS thật (Moodle...); quy chế trong DB là **bản mẫu**.
+- **Đã smoke test thủ công (2026-11-21)**: BE + agent chạy được; GET theo vai trò, RBAC, luồng hồ sơ draft→submitted→confirmed, chat Trợ lý (LLM thật) đều đạt.
+  **Chưa**: đề cương → mốc → thẩm định → tín chỉ → LMS sync, `pre-review`, upload tệp, mời/OAuth/email, job nền, FE; **chưa có test tự động cho phần mới** và `pytest`/`vitest`/lint chưa chạy. Chi tiết ở `docs/changes/20261121-nghiep-vu-thuc-tap.md`.
+- **Có thêm**: giao diện Tailwind (khung menu, đăng nhập, Tổng quan sinh viên có thanh hành trình, hàng chờ GV/QTV dạng thẻ; thiết kế ở `docs/thiet-ke-screen-flow.md`, chưa làm wizard hồ sơ/duyệt hai cột/ngăn Trợ lý nổi).
+- **Có thêm**: trang FE quản trị quy định `/admin/policies` (nạp → xem trước → xuất bản; chưa chạy thử trên trình duyệt).
+- **Chưa có**: danh sách thu hồi token bền (đang ở RAM), adapter LMS thật (Moodle...); quy chế trong DB là **bản mẫu**.
 - **Còn dở**: embedding quy chế (chạy lại `make seed-dev` khi agent gọi được OpenAI); lượt hỏi cá nhân đôi khi không gọi `get_my_*`; chưa chạy eval LLM thật; tool `get_my_*` của Trợ lý chưa trả thêm trạng thái đề cương.
-- **Thứ tự làm tiếp**: smoke test + sửa lỗi → viết test cho phần mới → tích hợp LMS thật khi biết hệ thống của trường → quy chế thật (R1).
+- **Thứ tự làm tiếp**: smoke test nốt luồng còn lại + FE → `make test`/lint/tsc và sửa lỗi → viết test cho phần mới → embedding quy chế + `make agent-eval` → LMS thật khi biết hệ thống của trường → quy chế thật (R1).
 
 ## Current Invariants (để không drift)
 

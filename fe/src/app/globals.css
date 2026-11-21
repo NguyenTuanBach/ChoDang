@@ -1,10 +1,14 @@
+@import "tailwindcss";
+
+/* Biến màu gốc: vẫn được `assistant.module.css` dùng, và Tailwind ánh xạ sang tên màu ở @theme bên dưới. */
 :root {
   --background: #ffffff;
   --foreground: #171717;
   --border: #e5e5e5;
   --muted: #6b7280;
   --code-bg: #f5f5f5;
-  --auth-bar-height: 2.75rem;
+  --surface: #fafafa;
+  --auth-bar-height: 3.25rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -14,17 +18,101 @@
     --border: #2a2a2a;
     --muted: #9ca3af;
     --code-bg: #171717;
+    --surface: #111111;
   }
 }
 
-html,
-body {
-  margin: 0;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+@theme inline {
+  --color-bg: var(--background);
+  --color-fg: var(--foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-soft: var(--code-bg);
+  --color-surface: var(--surface);
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-button {
-  cursor: pointer;
+@layer base {
+  html,
+  body {
+    margin: 0;
+    color: var(--foreground);
+    background: var(--background);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  /* Thẻ nhập thô trong các trang (không đi qua <Field>) vẫn có viền, bo góc và vòng focus. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    font: inherit;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--background);
+    color: var(--foreground);
+  }
+
+  textarea {
+    min-height: 6rem;
+    resize: vertical;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 1px;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: #2563eb;
+  }
+
+  /* Nút thô (không dùng <Button>) vẫn đọc được. */
+  button:not([class]) {
+    font: inherit;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--code-bg);
+    color: var(--foreground);
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  main a:not([class]) {
+    color: #2563eb;
+    text-underline-offset: 2px;
+  }
+
+  main a:not([class]):hover {
+    text-decoration: underline;
+  }
+
+  main h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  main h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  small {
+    color: var(--muted);
+  }
 }

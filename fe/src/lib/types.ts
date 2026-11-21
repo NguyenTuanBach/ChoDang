@@ -244,3 +244,19 @@ export type AuditEvent = {
   action: string;
   reason: string;
 };
+
+export type PolicyVersion = {
+  id: string;
+  doc_code: string;
+  doc_title: string;
+  version_label: string;
+  effective_from: string;
+  effective_to: string | null;
+  status: "draft" | "published" | "superseded";
+  is_sample: boolean;
+  chunk_count: number;
+};
+
+export type PolicyChunk = { chunk_id: string; article_no: string; clause_no: string | null; heading: string; text: string };
+export type PolicyPreview = { version: PolicyVersion; chunks: PolicyChunk[] };
+export type PolicyIngestResult = { version: PolicyVersion; chunk_count: number; embedded_count: number };
