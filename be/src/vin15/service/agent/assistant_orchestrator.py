@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -28,6 +29,26 @@ from vin15.infrastructure.security.actor_token import ActorTokenService
 from .agent_subject_resolver import AGENT_TOKEN_TTL_MINUTES, AGENT_TOOLS_SCOPE
 
 log = logging.getLogger(__name__)
+
+_PAGE_KEY = re.compile(r"^[a-z_]{1,40}$")
+_MAX_ACTION_LABEL = 80
+
+
+def valid_actions(raw: Any) -> list[dict[str, str]]:
+    """Hành động giao diện agent đề nghị trong ``final``: chỉ giữ điều hướng hợp lệ (khóa trang chữ thường/gạch dưới, nhãn ngắn), tối đa một.
+
+    FE vẫn tự kiểm khóa theo vai trò và tự đổi sang URL; đây là lớp lọc để BE không chuyển tiếp dữ liệu lạ từ agent tới trình duyệt.
+    Không lưu DB: tải lại lịch sử không có hành động nên không tự điều hướng lại.
+    """
+    if not isinstance(raw, list):
+        return []
+    for item in raw:
+        if not isinstance(item, dict) or item.get("type") != "navigate":
+            continue
+        page, label = item.get("page"), item.get("label")
+        if isinstance(page, str) and _PAGE_KEY.match(page) and isinstance(label, str) and 0 < len(label) <= _MAX_ACTION_LABEL:
+            return [{"type": "navigate", "page": page, "label": label}]
+    return []
 
 Emit = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -202,7 +223,7 @@ class AssistantOrchestrator:
         except Exception:
             log.exception("Không lưu được câu trả lời của trợ lý")
             return None, {"result": "error", "code": "internal"}
-        return {**frame, "message_id": str(message.id)}, outcome
+        return {**frame, "message_id": str(message.id), "actions": valid_actions(frame.get("actions"))}, outcome
 
     def _trace_step(self, frame: dict[str, Any]) -> dict[str, Any]:
         """Bước tiến trình đã che PII (mọi chuỗi) và chỉ giữ trường cần."""

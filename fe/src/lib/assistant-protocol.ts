@@ -24,6 +24,14 @@ export interface Citation {
   quote: string;
 }
 
+// Hành động giao diện do trợ lý đề nghị (hiện chỉ có điều hướng). `page` là khóa trang (lib/nav.ts), FE tự đổi sang URL
+// theo vai trò và bỏ qua khóa lạ. Chỉ có trong `final` của lượt đang chạy, không được lưu trong lịch sử hội thoại.
+export interface AssistantAction {
+  type: "navigate";
+  page: string;
+  label: string;
+}
+
 export interface Usage {
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
@@ -59,6 +67,7 @@ export type ServerFrame =
       usage: Usage;
       trace_id: string;
       message_id: string;
+      actions?: AssistantAction[];
     } & TurnScoped)
   | ({ type: "error"; code: ErrorCode; message: string } & Partial<TurnScoped>);
 

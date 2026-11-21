@@ -25,7 +25,7 @@ Khung (JSON, có `type`):
 | `tool_call` | agent→ | `name, label` |
 | `tool_result` | agent→ | `name, ok, summary` |
 | `token` | agent→ | `delta` |
-| `final` | agent→ | `answer, citations[], verdict, degraded, usage{prompt_tokens,completion_tokens,provider,model}, trace_id` |
+| `final` | agent→ | `answer, citations[], verdict, degraded, usage{prompt_tokens,completion_tokens,provider,model}, trace_id, actions[]` (`actions` mặc định `[]`; mỗi phần tử `{type:"navigate", page:<khóa trang>, label}` — hành động giao diện do tool `navigate_to` đề nghị. BE chỉ chuyển tiếp tối đa một điều hướng hợp lệ (`page` khớp `^[a-z_]{1,40}$`, `label` ≤ 80 ký tự), không lưu DB; FE tự đổi khóa sang URL theo vai trò và bỏ qua khóa lạ) |
 | `error` | agent→ | `code` (`busy\|rate_limited\|timeout\|cancelled\|llm_unavailable\|internal`), `message` |
 
 `verdict`: `answered | no_match | refused | needs_human | degraded | error_fallback`.

@@ -14,7 +14,10 @@ Prompt: `prompts/{intake,monitor_review,pre_review}.system.md`.
 Hợp đồng khung WebSocket: `.kiro/specs/agent-hoi-dap/contract.md`; bản mã: `policy_assistant/protocol.py`.
 
 Trợ lý chính sách (ReAct, mọi tool chỉ-đọc, gọi ngược BE `/api/agent-tools/*`): `search_policy`, `get_policy_clause` (mọi vai trò) và
-`get_my_*` (chỉ sinh viên, không tham số chủ thể). Hậu kiểm bằng code: trích dẫn `[cite:id]` ⊆ chunk đã thấy (≤ 5), số liệu phải có trong nguồn,
+`get_my_*` (chỉ sinh viên, không tham số chủ thể); giảng viên/quản trị viên có `get_staff_queue`, `list_risk_flags`, `get_dashboard_summary`,
+`list_internships` (chỉ tham số lọc; phạm vi do BE quyết từ agent-token). **Prompt và văn phong theo vai trò**: `prompts/policy_assistant.system.md` (phần chung)
++ `prompts/persona.{student,lecturer,admin}.md` (khối `<part id="persona">` giọng/cấu trúc và `<part id="workflow">` cách phân loại câu hỏi); câu từ chối
+cố định có biến thể `*_staff` cho giảng viên/quản trị viên (`prompts/refusals.md`). Hậu kiểm bằng code: trích dẫn `[cite:id]` ⊆ chunk đã thấy (≤ 5), số liệu phải có trong nguồn,
 viết lại cụm cam kết, che PII trước khi vào LLM/log, chế độ suy giảm (`degraded`) khi LLM sập.
 
 ## Chạy

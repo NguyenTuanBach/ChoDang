@@ -1,9 +1,12 @@
 "use client";
 
+import { AlarmClock, Download, FolderOpen, Flag } from "lucide-react";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, MILESTONE_STATUS } from "@/lib/labels";
 import type { Dashboard } from "@/lib/types";
-import { Async, Card, Cols, Empty, Page, ProgressBar, Row, Table } from "@/components/ui/ui";
+import { Async, Card, Cols, Empty, Page, ProgressBar, Row, StatCard, Table } from "@/components/ui/ui";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const KIND_LABEL: Record<string, string> = { internship: "Hồ sơ", outline: "Đề cương", milestone: "Mốc", request: "Yêu cầu" };
 const CREDIT_LABEL: Record<string, string> = {
@@ -20,7 +23,7 @@ function Bars({ rows, labels }: { rows: { key: string; n: number }[]; labels: Re
   return (
     <>
       {rows.map((r) => (
-        <div key={r.key} style={{ marginBottom: "0.5rem" }}>
+        <div key={r.key} className="mb-3 last:mb-0">
           <Row>
             <span>{labels[r.key] ?? r.key}</span>
             <strong>{r.n}</strong>
@@ -36,7 +39,16 @@ function Bars({ rows, labels }: { rows: { key: string; n: number }[]; labels: Re
 export default function DashboardView() {
   const state = useApi<Dashboard>("/api/dashboard");
   return (
-    <Page title="Dashboard" actions={<a href="/api/dashboard/export.csv">Xuất báo cáo (CSV)</a>}>
+    <Page
+      title="Dashboard"
+      description="Tiến độ, trễ hạn, rủi ro và công nhận tín chỉ."
+      actions={
+        <a href="/api/dashboard/export.csv" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-9 px-3.5 shadow-xs")}>
+          <Download className="size-4" aria-hidden="true" />
+          Xuất báo cáo (CSV)
+        </a>
+      }
+    >
       <Async state={state}>
         {(d) => {
           const total = d.internships_by_status.reduce((s, r) => s + r.n, 0);
@@ -45,21 +57,23 @@ export default function DashboardView() {
           const flagTotal = openFlags.reduce((s, f) => s + f.n, 0);
           return (
             <>
-              <Cols>
-                <Card title="Tổng số hồ sơ">
-                  <h2 style={{ fontSize: "2rem", margin: 0 }}>{total}</h2>
-                </Card>
-                <Card title="Tỷ lệ trễ hạn">
-                  <h2 style={{ fontSize: "2rem", margin: 0 }}>{lateRate}%</h2>
-                  <small>
-                    {d.late_internships}/{d.active_internships} hồ sơ đang thực tập có mốc quá hạn
-                  </small>
-                </Card>
-                <Card title="Cờ rủi ro đang mở">
-                  <h2 style={{ fontSize: "2rem", margin: 0 }}>{flagTotal}</h2>
-                  <small>{openFlags.map((f) => `${f.severity}: ${f.n}`).join(" · ") || "Không có"}</small>
-                </Card>
-              </Cols>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <StatCard label="Tổng số hồ sơ" value={total} icon={FolderOpen} />
+                <StatCard
+                  label="Tỷ lệ trễ hạn"
+                  value={`${lateRate}%`}
+                  hint={`${d.late_internships}/${d.active_internships} hồ sơ đang thực tập có mốc quá hạn`}
+                  icon={AlarmClock}
+                  tone={lateRate > 0 ? "bad" : "good"}
+                />
+                <StatCard
+                  label="Cờ rủi ro đang mở"
+                  value={flagTotal}
+                  hint={openFlags.map((f) => `${f.severity}: ${f.n}`).join(" · ") || "Không có"}
+                  icon={Flag}
+                  tone={flagTotal > 0 ? "warn" : "good"}
+                />
+              </div>
               <Cols>
                 <Card title="Hồ sơ theo trạng thái">
                   <Bars rows={d.internships_by_status.map((r) => ({ key: r.status, n: r.n }))} labels={INTERNSHIP_STATUS} />
@@ -87,7 +101,7 @@ export default function DashboardView() {
               {d.sync_jobs.length > 0 && (
                 <Card title="Đồng bộ LMS">
                   {d.sync_jobs.map((s) => (
-                    <p key={s.status}>
+                    <p key={s.status} className="my-1 text-sm">
                       {s.status}: {s.n}
                     </p>
                   ))}

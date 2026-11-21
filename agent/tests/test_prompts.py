@@ -51,6 +51,8 @@ def _system_prompt(**over):
     values = {
         "today": "2026-11-21",
         "user_role": "sinh viên",
+        "persona": "PERSONA-X",
+        "role_workflow": "WORKFLOW-X",
         "school_name": "Trường Mẫu",
         "sample_notice": REAL.sections("refusals")["sample_notice"],
         "citation_rules": REAL.raw("citation_rules"),
@@ -63,7 +65,7 @@ def _system_prompt(**over):
 
 def test_system_prompt_renders_with_all_blocks():
     prompt = _system_prompt()
-    for block in ("role", "workflow", "rules", "safeguards", "citation_rules", "refusal_markers", "answer_format"):
+    for block in ("role", "persona", "workflow", "rules", "safeguards", "citation_rules", "refusal_markers"):
         assert f"<{block}>" in prompt and f"</{block}>" in prompt, block
     assert "Trường Mẫu" in prompt and "2026-11-21" in prompt and "sinh viên" in prompt
     assert "{{" not in prompt and "}}" not in prompt.replace("]]", "")  # không sót placeholder
@@ -86,3 +88,15 @@ def test_refusal_templates_are_complete():
     assert required <= templates.keys()
     # hướng dẫn gửi cho LLM không chứa nguyên văn mẫu (LLM chỉ xuất dấu hiệu)
     assert templates["no_basis"] not in _system_prompt()
+
+
+def test_persona_files_have_both_parts_for_every_role():
+    for role in ("student", "lecturer", "admin"):
+        parts = REAL.sections(f"persona.{role}", tag="part")
+        assert set(parts) == {"persona", "workflow"} and all(v.strip() for v in parts.values()), role
+        assert "{{" not in parts["persona"] + parts["workflow"]
+
+
+def test_staff_refusal_templates_exist():
+    templates = REAL.sections("refusals")
+    assert {"other_user_staff", "out_of_scope_staff", "no_basis_staff", "no_basis_partial_staff"} <= templates.keys()

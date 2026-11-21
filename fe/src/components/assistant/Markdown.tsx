@@ -1,8 +1,14 @@
 import type { ReactNode } from "react";
 import type { Citation } from "@/lib/assistant-protocol";
 import { hideIncompleteCite, parseMarkdown, type Inline } from "@/lib/assistant/markdown";
-import { citationLabel } from "./citation";
-import styles from "./assistant.module.css";
+import { CHIP_CLASS, CHIP_SAMPLE_CLASS, CHIP_UNKNOWN_CLASS, citationLabel } from "./citation";
+
+const MARKDOWN_CLASS =
+  "text-sm leading-relaxed break-words [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 " +
+  "[&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-base [&_h3]:font-semibold [&_h4]:mb-1 [&_h4]:mt-3 [&_h4]:font-semibold [&_h5]:mt-2 [&_h5]:font-semibold [&_h6]:mt-2 [&_h6]:font-semibold " +
+  "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:p-0 " +
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground " +
+  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2";
 
 interface Props {
   text: string;
@@ -40,7 +46,7 @@ export default function Markdown({ text, citations, streaming = false, onCite }:
           // Trích dẫn không có trong danh sách do code dựng: không cho bấm, để người đọc thấy nó chưa được xác minh.
           if (!citation) {
             return (
-              <span key={index} className={styles.chipUnknown} title="Nguồn này không có trong danh sách trích dẫn đã xác minh">
+              <span key={index} className={CHIP_UNKNOWN_CLASS} title="Nguồn này không có trong danh sách trích dẫn đã xác minh">
                 nguồn chưa xác minh
               </span>
             );
@@ -49,7 +55,7 @@ export default function Markdown({ text, citations, streaming = false, onCite }:
             <button
               key={index}
               type="button"
-              className={citation.is_sample ? `${styles.chip} ${styles.chipSample}` : styles.chip}
+              className={citation.is_sample ? CHIP_SAMPLE_CLASS : CHIP_CLASS}
               title="Xem nguyên văn"
               onClick={() => onCite(citation)}
             >
@@ -62,7 +68,7 @@ export default function Markdown({ text, citations, streaming = false, onCite }:
   }
 
   return (
-    <div className={styles.markdown}>
+    <div className={MARKDOWN_CLASS}>
       {blocks.map((block, index) => {
         switch (block.kind) {
           case "paragraph":

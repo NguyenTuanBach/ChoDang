@@ -96,6 +96,12 @@ def test_personal_tool_no_record_and_forbidden():
 def test_registry_by_role():
     _, client, ai, _ = setup()
     student = build_registry("student", client, ai).names()
-    assert student == ["search_policy", "get_policy_clause", "get_my_internship", "get_my_milestones", "get_my_progress", "get_my_credit_checklist", "get_my_requests"]
+    assert student == [
+        "search_policy", "get_policy_clause", "get_my_internship", "get_my_milestones", "get_my_progress", "get_my_credit_checklist", "get_my_requests", "navigate_to",
+    ]  # fmt: skip
     for role in ("lecturer", "admin"):
-        assert build_registry(role, client, ai).names() == ["search_policy", "get_policy_clause"]
+        assert build_registry(role, client, ai).names() == [
+            "search_policy", "get_policy_clause", "get_staff_queue", "list_risk_flags", "get_dashboard_summary", "list_internships", "navigate_to",
+        ]  # fmt: skip
+    assert build_registry("student", client, ai).data_tool_names() == frozenset(n for n in student if n.startswith("get_my_"))  # navigate_to không phải tool dữ liệu
+    assert build_registry("lecturer", client, ai).data_tool_names() == frozenset({"get_staff_queue", "list_risk_flags", "get_dashboard_summary", "list_internships"})

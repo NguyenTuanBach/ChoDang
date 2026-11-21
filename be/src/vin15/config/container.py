@@ -7,44 +7,45 @@ from functools import cached_property
 from vin15.domain.clock import Clock, business_clock
 from vin15.domain.exception import DatabaseUnavailableError
 from vin15.domain.pii import PiiRedactor
+from vin15.domain.ports import FileStorage, Mailer
 from vin15.infrastructure.agent_api import AgentApiClient
+from vin15.infrastructure.lms import MiniLmsAdapter, MiniLmsAdmin
+from vin15.infrastructure.mail import LogMailer, SmtpMailer
+from vin15.infrastructure.oauth import GoogleOAuthClient
 from vin15.infrastructure.persistence.audit_repository import AuditRepository
+from vin15.infrastructure.persistence.case_repository import CaseRepository
 from vin15.infrastructure.persistence.chat_repository import ChatRepository
+from vin15.infrastructure.persistence.config_repository import ConfigRepository
 from vin15.infrastructure.persistence.database import Database
 from vin15.infrastructure.persistence.internship_repository import InternshipRepository
+from vin15.infrastructure.persistence.monitoring_repository import MonitoringRepository
+from vin15.infrastructure.persistence.notification_repository import NotificationRepository
 from vin15.infrastructure.persistence.policy_repository import PolicyRepository
+from vin15.infrastructure.persistence.report_repository import ReportRepository
+from vin15.infrastructure.persistence.request_repository import RequestRepository
 from vin15.infrastructure.persistence.user_repository import UserRepository
 from vin15.infrastructure.security.actor_token import ActorTokenService
+from vin15.infrastructure.storage import LocalFileStorage, R2FileStorage
+from vin15.service.agent.agent_staff_reads import AgentStaffReads
 from vin15.service.agent.agent_subject_resolver import AgentSubjectResolver
 from vin15.service.agent.agent_tool_service import AgentToolService
 from vin15.service.agent.assistant_limits import AskRateLimiter, ConnectionLimiter
 from vin15.service.agent.assistant_orchestrator import AssistantOrchestrator
 from vin15.service.agent.conversation_service import ConversationService
 from vin15.service.agent.ws_ticket_store import WsTicketStore
+from vin15.service.auth.account_activation_service import AccountActivationService
 from vin15.service.auth.current_user_service import CurrentUserService
 from vin15.service.auth.dev_login_service import DevLoginService
-from vin15.service.credit.credit_checklist_service import CreditChecklistService
-from vin15.service.health_service import HealthService
-from vin15.service.internship.internship_read_service import InternshipReadService
-from vin15.domain.ports import FileStorage, Mailer
-from vin15.infrastructure.lms import MiniLmsAdapter, MiniLmsAdmin
-from vin15.infrastructure.mail import LogMailer, SmtpMailer
-from vin15.infrastructure.persistence.case_repository import CaseRepository
-from vin15.infrastructure.persistence.config_repository import ConfigRepository
-from vin15.infrastructure.persistence.monitoring_repository import MonitoringRepository
-from vin15.infrastructure.persistence.notification_repository import NotificationRepository
-from vin15.infrastructure.persistence.report_repository import ReportRepository
-from vin15.infrastructure.persistence.request_repository import RequestRepository
-from vin15.infrastructure.storage import LocalFileStorage, R2FileStorage
-from vin15.infrastructure.oauth import GoogleOAuthClient
-from vin15.service.auth.account_activation_service import AccountActivationService
 from vin15.service.auth.google_login_service import GoogleLoginService
+from vin15.service.credit.credit_checklist_service import CreditChecklistService
 from vin15.service.credit.credit_decision_service import CreditDecisionService
 from vin15.service.dashboard.report_service import ReportService
 from vin15.service.exception.request_service import RequestService
+from vin15.service.health_service import HealthService
 from vin15.service.internship.config_service import ConfigService
-from vin15.service.internship.internship_service import InternshipService
 from vin15.service.internship.intake_service import IntakeService
+from vin15.service.internship.internship_read_service import InternshipReadService
+from vin15.service.internship.internship_service import InternshipService
 from vin15.service.jobs.scheduler import JobRunner
 from vin15.service.lms.lms_admin_service import LmsAdminService
 from vin15.service.lms.lms_port import LmsPort
@@ -54,10 +55,10 @@ from vin15.service.monitoring.monitoring_service import MonitoringService
 from vin15.service.monitoring.pre_review_service import PreReviewService
 from vin15.service.notification.notification_service import NotificationService
 from vin15.service.outline.outline_service import OutlineService
-from vin15.service.user.account_service import AccountService
 from vin15.service.policy.policy_ingest_service import PolicyIngestService
 from vin15.service.policy.policy_publish_service import PolicyPublishService
 from vin15.service.policy.policy_search_service import PolicySearchService
+from vin15.service.user.account_service import AccountService
 
 from .settings import Settings
 
@@ -374,7 +375,12 @@ class Container:
             self.credit_checklist_service,
             self.audit_repository,
             self.pii_redactor,
+            lambda: self.agent_staff_reads,
         )
+
+    @cached_property
+    def agent_staff_reads(self) -> AgentStaffReads:
+        return AgentStaffReads(self.user_repository, self.report_service, self.monitoring_service)
 
     @cached_property
     def assistant_orchestrator(self) -> AssistantOrchestrator:

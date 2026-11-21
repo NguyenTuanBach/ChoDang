@@ -15,6 +15,7 @@ _NO_PARAMS: dict[str, Any] = {"type": "object", "properties": {}, "additionalPro
 
 class PersonalTool(BaseTool):
     parameters = _NO_PARAMS
+    data_source = True
 
     def __init__(self, be: BeToolsClient, *, name: str, endpoint: str, label: str, description: str) -> None:
         self._be, self._endpoint = be, endpoint

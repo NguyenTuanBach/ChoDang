@@ -1,7 +1,7 @@
 """Các tool chỉ-đọc của agent. Mỗi lời gọi ghi **đúng một** ``audit_event`` (``actor_kind='agent'``), kể cả khi bị từ chối.
 
 Chủ thể (``AgentToolSubject``) do BE quyết; tool không nhận tham số chủ thể nên không có đường lấy dữ liệu người khác.
-Tool cá nhân (``me/*``) chỉ dành cho sinh viên; giảng viên/quản trị chỉ dùng tool tra quy định.
+Tool cá nhân (``me/*``) chỉ dành cho sinh viên; tool ``staff/*`` chỉ dành cho giảng viên/quản trị viên (phạm vi do BE quyết).
 """
 
 from __future__ import annotations
@@ -15,6 +15,13 @@ from vin15.domain.model.audit import ActorKind, AuditEntry
 from vin15.domain.model.policy import PolicyChunkLookup, PolicySearchResult
 from vin15.domain.pii import PiiRedactor
 from vin15.infrastructure.persistence.audit_repository import AuditRepository
+from vin15.service.agent.agent_staff_reads import (
+    AgentStaffReads,
+    DashboardResult,
+    FlagsResult,
+    InternshipsResult,
+    QueueResult,
+)
 from vin15.service.credit.credit_checklist_service import CreditChecklist, CreditChecklistService
 from vin15.service.internship.internship_read_service import (
     InternshipReadService,
@@ -40,12 +47,15 @@ class AgentToolService:
         credit: CreditChecklistService,
         audit: AuditRepository,
         redactor: PiiRedactor,
+        staff: Callable[[], AgentStaffReads],
     ):
         self._search = search
         self._reads = reads
         self._credit = credit
         self._audit = audit
         self._redactor = redactor
+        # Dựng muộn: tool tra quy định/cá nhân không cần ReportService/MonitoringService (và kết nối DB của chúng).
+        self._staff_factory = staff
 
     # ---- Tra quy định (mọi vai trò) ----
     def policy_search(self, subject: AgentToolSubject, query: str, query_vector: list[float] | None, top_k: int) -> PolicySearchResult:
@@ -76,12 +86,30 @@ class AgentToolService:
     def my_requests(self, subject: AgentToolSubject) -> RequestsResult:
         return self._run(subject, "get_my_requests", {}, lambda: self._reads.requests(subject.user_id), student_only=True)
 
+    # ---- Dữ liệu cho giảng viên/quản trị viên (phạm vi do BE quyết từ chủ thể) ----
+    def staff_queue(self, subject: AgentToolSubject) -> QueueResult:
+        return self._run(subject, "get_staff_queue", {}, lambda: self._staff_factory().queue(subject), staff_only=True)
+
+    def staff_flags(self, subject: AgentToolSubject, status: str | None) -> FlagsResult:
+        return self._run(subject, "list_risk_flags", {"status": status}, lambda: self._staff_factory().flags(subject, status), staff_only=True)
+
+    def staff_dashboard(self, subject: AgentToolSubject, cohort: str | None) -> DashboardResult:
+        return self._run(subject, "get_dashboard_summary", {"cohort": cohort}, lambda: self._staff_factory().dashboard(subject, cohort), staff_only=True)
+
+    def staff_internships(self, subject: AgentToolSubject, status: str | None, overdue_only: bool, cohort: str | None) -> InternshipsResult:
+        params = {"status": status, "overdue_only": overdue_only, "cohort": cohort}
+        return self._run(subject, "list_internships", params, lambda: self._staff_factory().internships(subject, status, overdue_only, cohort), staff_only=True)
+
     # ---- Chung ----
-    def _run(self, subject: AgentToolSubject, tool: str, params: dict, call: Callable[[], T], *, student_only: bool = False) -> T:
+    def _run(
+        self, subject: AgentToolSubject, tool: str, params: dict, call: Callable[[], T], *, student_only: bool = False, staff_only: bool = False
+    ) -> T:
         outcome = "ok"
         try:
             if student_only and subject.role != "student":
-                raise ForbiddenRoleError("Tool này chỉ dành cho sinh viên: giảng viên và quản trị viên chỉ tra cứu quy định")
+                raise ForbiddenRoleError("Tool này chỉ dành cho sinh viên: giảng viên và quản trị viên dùng tool tra quy định và tool dữ liệu phạm vi phụ trách")
+            if staff_only and subject.role not in ("lecturer", "admin"):
+                raise ForbiddenRoleError("Tool này chỉ dành cho giảng viên và quản trị viên")
             return call()
         except ForbiddenRoleError:
             outcome = FORBIDDEN_ROLE

@@ -29,12 +29,19 @@ SERVICE = {"Authorization": "Bearer svc-token"}
 ME = ("internship", "milestones", "progress", "credit-checklist", "requests")
 
 
+class _NoCreditChecklist:
+    def checklist(self, *args, **kwargs):  # pragma: no cover - chỉ để lộ lỗi rõ nếu test vô tình gọi
+        raise AssertionError("test này không dựng dịch vụ tín chỉ (cần LMS/database)")
+
+
 def build(**settings_overrides):
     settings = make_settings(agent_api_service_token="svc-token", jwt_secret="j" * 40, **settings_overrides)
     container = Container(settings)
     container.clock = lambda: TODAY
     container.user_repository = FakeUsers(ADMIN, LECTURER, STUDENT_A, STUDENT_B, STUDENT_NO_RECORD, REVOKED)
     container.audit_repository = FakeAudit()
+    # Dịch vụ tín chỉ cần LMS (database) khi dựng thật; các test ở đây không dùng nó (riêng test credit-checklist tự dựng bản có LMS giả).
+    container.credit_checklist_service = _NoCreditChecklist()
     container.internship_repository = FakeInternships({STUDENT_A.id: internship_a(), STUDENT_B.id: internship_b()})
     container.policy_search_service = FakePolicySearch(
         [chunk(), chunk("QD-TT-01@v1/d4", article_no="4", clause_no=None, text="Nhật ký hằng tuần.")]
@@ -358,3 +365,54 @@ def test_db_not_configured_is_503_in_contract_shape():
     client = TestClient(create_app(settings, Container(settings)))
     response = client.get("/api/agent-tools/me/internship", headers=SERVICE)
     assert response.status_code == 503 and error_of(response)["code"] == "database_unavailable"
+
+
+# ---- tool của giảng viên/quản trị viên: chỉ staff dùng được, sinh viên bị từ chối và vẫn có audit ----
+STAFF = ("queue", "flags", "dashboard", "internships")
+
+
+class FakeStaffReads:
+    def queue(self, subject):
+        from vin15.service.agent.agent_staff_reads import QueueResult
+
+        return QueueResult(0, [])
+
+    def flags(self, subject, status):
+        from vin15.service.agent.agent_staff_reads import FlagsResult
+
+        return FlagsResult(0, [])
+
+    def dashboard(self, subject, cohort):
+        from vin15.service.agent.agent_staff_reads import DashboardResult
+
+        return DashboardResult("test", 1, 2, {"in_progress": 1}, {}, {"warning": 1})
+
+    def internships(self, subject, status, overdue_only, cohort):
+        from vin15.service.agent.agent_staff_reads import InternshipsResult
+
+        return InternshipsResult(0, [])
+
+
+@pytest.mark.parametrize("endpoint", STAFF)
+def test_staff_tools_forbidden_for_student_and_audited(client, container, endpoint):
+    container.agent_staff_reads = FakeStaffReads()
+    response = client.get(f"/api/agent-tools/staff/{endpoint}", headers=on_behalf(container, STUDENT_A))
+    assert response.status_code == 403 and error_of(response)["code"] == "forbidden_role"
+    entry = container.audit_repository.entries[-1]
+    assert entry.actor_kind.value == "agent" and entry.after["outcome"] == "forbidden_role"
+
+
+@pytest.mark.parametrize("user", [LECTURER, ADMIN])
+@pytest.mark.parametrize("endpoint", STAFF)
+def test_staff_tools_ok_for_lecturer_and_admin_and_audited(client, container, user, endpoint):
+    container.agent_staff_reads = FakeStaffReads()
+    response = client.get(f"/api/agent-tools/staff/{endpoint}", headers=on_behalf(container, user))
+    assert response.status_code == 200
+    entry = container.audit_repository.entries[-1]
+    assert entry.actor_role == user.role.value and entry.after["outcome"] == "ok"
+
+
+def test_staff_dashboard_payload(client, container):
+    container.agent_staff_reads = FakeStaffReads()
+    body = client.get("/api/agent-tools/staff/dashboard", headers=on_behalf(container, LECTURER)).json()
+    assert body["late_internships"] == 2 and body["open_flags_by_severity"] == {"warning": 1}

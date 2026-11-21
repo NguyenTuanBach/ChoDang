@@ -1,10 +1,10 @@
-import AuthGate from "@/components/auth/AuthGate";
+import AuthProvider from "@/components/auth/AuthProvider";
 import HomeRedirect from "@/components/shared/HomeRedirect";
 
 export default function Home() {
   return (
-    <AuthGate>
+    <AuthProvider>
       <HomeRedirect />
-    </AuthGate>
+    </AuthProvider>
   );
 }

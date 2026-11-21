@@ -69,6 +69,10 @@ class TurnContext:
     tool_texts: list[str] = field(default_factory=list)
     redactor: PiiRedactor = field(default_factory=PiiRedactor)
     trace: TurnTrace = field(default_factory=TurnTrace)
+    #: Hành động giao diện mà tool yêu cầu trong lượt này (hiện chỉ ``{"type": "navigate", "page": khóa, "label": tên}``); vào ``final.actions``.
+    actions: list[dict[str, str]] = field(default_factory=list)
+    #: Tên các tool đọc dữ liệu của BE (hồ sơ, hàng chờ...; không phải tra quy định) trong registry của lượt này.
+    data_tool_names: frozenset[str] = frozenset()
 
 
 @runtime_checkable
@@ -95,6 +99,8 @@ class BaseTool:
     parameters: dict[str, Any]
     label: str
     read_only: Literal[True] = True
+    #: ``True`` nếu tool đọc dữ liệu nghiệp vụ của BE (câu trả lời dựa trên đó không cần ``[cite]`` quy định).
+    data_source: bool = False
 
     async def run(self, args: dict[str, Any], ctx: TurnContext) -> ToolResult:  # pragma: no cover - lớp con ghi đè
         raise NotImplementedError
@@ -147,6 +153,9 @@ class ToolRegistry:
 
     def names(self) -> list[str]:
         return list(self._tools)
+
+    def data_tool_names(self) -> frozenset[str]:
+        return frozenset(name for name, tool in self._tools.items() if getattr(tool, "data_source", False) is True)
 
     def __len__(self) -> int:
         return len(self._tools)

@@ -1,6 +1,7 @@
 // Reducer trạng thái chat của trợ lý hỏi đáp, tổ chức theo turn_id.
 // Thuần (không I/O): hook useAssistant phát action, thành phần chỉ đọc state.
 import type {
+  AssistantAction,
   Citation,
   ConversationDetail,
   ErrorCode,
@@ -40,6 +41,7 @@ export interface Turn {
   degraded: boolean;
   messageId: string | null;
   error: UiError | null;
+  actions: AssistantAction[]; // hành động giao diện từ `final` của lượt đang chạy; lượt tải từ lịch sử luôn rỗng
 }
 
 export type ConnectionState = "idle" | "connecting" | "ready" | "reconnecting" | "closed";
@@ -86,6 +88,7 @@ function newTurn(turnId: string, question: string): Turn {
     degraded: false,
     messageId: null,
     error: null,
+    actions: [],
   };
 }
 
@@ -154,6 +157,7 @@ function applyFrame(state: ChatState, frame: ServerFrame): ChatState {
           messageId: frame.message_id,
           step: null,
           error: null,
+          actions: frame.actions ?? [],
         })),
         activeTurnId: finishActive(adopted, turnId),
       };

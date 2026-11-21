@@ -190,3 +190,68 @@ class MeRequestsResponse(_Availability):
             reason=result.reason,
             requests=[RequestDto(kind=r.kind, status=r.status, created_at=r.created_at) for r in result.requests],
         )
+
+
+# ---- Tool của giảng viên/quản trị viên (chỉ-đọc, trường tối thiểu: không email/SĐT/MST) ----
+class _FromObject(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StaffQueueItemDto(_FromObject):
+    kind: str
+    internship_id: int
+    student_name: str
+    title: str
+    since: date | None
+    due_date: date | None
+    severity: str | None
+    priority: int
+
+
+class StaffQueueResponse(_FromObject):
+    total: int
+    items: list[StaffQueueItemDto]
+
+
+class StaffFlagDto(_FromObject):
+    id: int
+    internship_id: int
+    student_name: str
+    kind: str
+    severity: str
+    status: str
+    reason: str
+    created_at: date | None
+
+
+class StaffFlagsResponse(_FromObject):
+    total: int
+    items: list[StaffFlagDto]
+
+
+class StaffDashboardResponse(_FromObject):
+    scope: str
+    active_internships: int
+    late_internships: int
+    internships_by_status: dict[str, int]
+    milestones_by_status: dict[str, int]
+    open_flags_by_severity: dict[str, int]
+    credit_outcomes: dict[str, int]
+
+
+class StaffInternshipDto(_FromObject):
+    id: int
+    cohort: str
+    status: str
+    student_name: str
+    company_name: str
+    start_date: date | None
+    end_date: date | None
+    overdue_milestones: int
+    submitted_milestones: int
+    open_flags: int
+
+
+class StaffInternshipsResponse(_FromObject):
+    total: int
+    items: list[StaffInternshipDto]

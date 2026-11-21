@@ -48,6 +48,7 @@ Hướng phụ thuộc (kiểm bởi `tests/test_architecture.py`):
 | `GET /api/assistant/conversations[/{id}]`, `GET /api/assistant/traces/{trace_id}` | Hội thoại của chính mình; vết (chủ sở hữu hoặc quản trị viên) |
 | `POST /api/agent-tools/policy/search`, `GET /api/agent-tools/policy/chunks/{id}` | Tool tra quy định đang hiệu lực (agent gọi; service token + `X-On-Behalf-Of`) |
 | `GET /api/agent-tools/me/{internship,milestones,progress,credit-checklist,requests}` | Tool cá nhân chỉ-đọc, chủ thể do BE quyết; chỉ sinh viên. Lỗi theo hợp đồng `{"error":{"code","message"}}` |
+| `GET /api/agent-tools/staff/{queue,flags,dashboard,internships}` | Tool dữ liệu chỉ-đọc cho giảng viên/quản trị viên; phạm vi (GV: sinh viên mình phụ trách, QTV: toàn bộ) do BE quyết từ agent-token, tối đa 30 mục, không email/SĐT/MST; sinh viên → 403 `forbidden_role` |
 | `GET/POST /api/admin/policies…` | Quản trị viên: nạp văn bản (tách Điều/Khoản, bản nháp), xem trước, xuất bản |
 | `/api/auth/{me,logout,providers,google/login,google/callback}`, `/api/auth/dev-*` | Phiên cookie; Google OAuth (chỉ email đã mời); đăng nhập dev (ngoài production) |
 | `/api/invitations…`, `/api/lecturers`, `/api/students/{id}/{advisor,code}` | Mời GV (QTV) / SV (GV, QTV), thu hồi, mời lại, gán GV phụ trách, mã sinh viên |

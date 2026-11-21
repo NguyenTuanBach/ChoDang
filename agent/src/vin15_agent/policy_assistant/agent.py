@@ -21,6 +21,7 @@ from vin15_agent.core.tracing import TurnTrace
 from vin15_agent.policy_assistant.be_client import BeClientFactory, BeToolsClient
 from vin15_agent.policy_assistant.degraded import degraded_answer, render_chunk_listing
 from vin15_agent.policy_assistant.protocol import (
+    Action,
     Citation,
     ErrorFrame,
     FinalFrame,
@@ -33,7 +34,7 @@ from vin15_agent.policy_assistant.protocol import (
     Usage,
     Verdict,
 )
-from vin15_agent.policy_assistant.registry import POLICY_TOOL_NAMES, build_registry
+from vin15_agent.policy_assistant.registry import POLICY_TOOL_NAMES, STAFF_ROLES, build_registry
 from vin15_agent.policy_assistant.verify import (
     CITE_RE,
     build_citations,
@@ -50,6 +51,7 @@ logger = logging.getLogger(__name__)
 Emit = Callable[[OutboundFrame], Awaitable[None]]
 
 ROLE_LABELS = {"student": "sinh viên", "lecturer": "giảng viên", "admin": "quản trị viên"}
+_STAFF_SUFFIX = "_staff"
 _MARKER = re.compile(r"\[\[\s*(refuse:(\w+)|no_basis|needs_human)\s*\]\]")
 _TOKEN_PIECE = re.compile(r"\S+\s*")
 _WORDS_PER_TOKEN = 3
@@ -87,12 +89,17 @@ class PolicyAssistant:
 
     async def _run(self, start: StartFrame, ctx: TurnContext, be: BeToolsClient, emit: Emit) -> None:
         redactor, trace = ctx.redactor, ctx.trace
+        if start.actor.role not in ROLE_LABELS:  # không rơi về vai trò sinh viên khi vai trò lạ
+            logger.error("Vai trò không hợp lệ cho Trợ lý: %r (trace=%s)", start.actor.role, trace.trace_id)
+            await emit(ErrorFrame(code="internal", message=_INTERNAL_ERROR))
+            return
         question = redactor.redact_text(start.question)
         history = [{"role": h.role, "content": redactor.redact_text(h.content)} for h in start.history]
         trace.step("start")
         await emit(StatusFrame(step="planning", text="Đang phân tích câu hỏi…"))
 
         registry = build_registry(start.actor.role, be, self._ai)
+        ctx.data_tool_names = registry.data_tool_names()
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self._system_prompt(start)},
             *history,
@@ -142,10 +149,14 @@ class PolicyAssistant:
 
     def _system_prompt(self, start: StartFrame) -> str:
         loader = self._loader
+        role = start.actor.role
+        parts = loader.sections(f"persona.{role}", tag="part")
         return loader.render(
             "policy_assistant.system",
+            persona=parts["persona"],
+            role_workflow=parts["workflow"],
             today=start.today,
-            user_role=ROLE_LABELS.get(start.actor.role, start.actor.role),
+            user_role=ROLE_LABELS[role],
             school_name=self._settings.school_name,
             sample_notice=self._templates.get("sample_notice", "") if self._settings.assistant_sample_notice else "",
             citation_rules=loader.raw("citation_rules"),
@@ -157,35 +168,41 @@ class PolicyAssistant:
 
     def _postprocess(self, text: str, start: StartFrame, question: str, ctx: TurnContext) -> _Answer:
         t = self._templates
+        staff = start.actor.role in STAFF_ROLES
+
+        def tpl(key: str) -> str:
+            """Mẫu câu cố định theo nhóm vai trò: giảng viên/quản trị viên dùng ``<key>_staff`` nếu có."""
+            return (t.get(key + _STAFF_SUFFIX) if staff else None) or t[key]
+
         needs_human = False
         verdict: Verdict = "answered"
 
         markers = list(_MARKER.finditer(text))
         for m in markers:
             if m.group(2):  # refuse:<id>: thay toàn bộ bằng mẫu cố định
-                template = t.get(m.group(2)) or t["out_of_scope"]
+                template = (t.get(m.group(2) + _STAFF_SUFFIX) if staff else None) or t.get(m.group(2)) or tpl("out_of_scope")
                 return _Answer(template, "refused", [])
         needs_human = any(m.group(1) == "needs_human" for m in markers)
         no_basis = any(m.group(1) == "no_basis" for m in markers)
         text = _MARKER.sub("", text).strip()
         if no_basis and len(text) < 40:
-            return _Answer(t["no_basis"], "no_match", [])
+            return _Answer(tpl("no_basis"), "no_match", [])
         if no_basis:
-            text += "\n\n" + t["no_basis_partial"]
+            text += "\n\n" + tpl("no_basis_partial")
 
-        cites = verify_citations(text, ctx.seen_chunks.keys(), no_basis_partial=t["no_basis_partial"])
+        cites = verify_citations(text, ctx.seen_chunks.keys(), no_basis_partial=tpl("no_basis_partial"))
         text = guard_commitments(cites.text, t["no_commitment"]).text
         extra_sources = [question, start.today, *(h.content for h in start.history)]
         text = check_numbers(text, number_sources(ctx.seen_chunks, ctx.tool_texts, extra_sources), t["number_mismatch"]).text
 
         cited_ids = list(dict.fromkeys(CITE_RE.findall(text)))
         used_policy_tool = any(c["name"] in POLICY_TOOL_NAMES for c in ctx.trace.tool_calls)
-        used_personal_ok = any(c["name"].startswith("get_my_") and c["ok"] for c in ctx.trace.tool_calls)
+        used_data_ok = any(c["name"] in ctx.data_tool_names and c["ok"] for c in ctx.trace.tool_calls)
         substantive = text
         for key in ("no_basis_partial", "number_mismatch", "no_commitment"):
-            substantive = substantive.replace(t[key], "")
-        if not substantive.strip() or (used_policy_tool and not cited_ids and not used_personal_ok):
-            return _Answer(t["no_basis"], "no_match", [])
+            substantive = substantive.replace(tpl(key), "")
+        if not substantive.strip() or (used_policy_tool and not cited_ids and not used_data_ok):
+            return _Answer(tpl("no_basis"), "no_match", [])
 
         if sample_warning_needed(ctx.seen_chunks, cited_ids) and t["sample_warning"] not in text:
             text += "\n\n" + t["sample_warning"]
@@ -221,10 +238,13 @@ class PolicyAssistant:
         await emit(StatusFrame(step="answering", text="Đang soạn câu trả lời…"))
         for piece in token_pieces(answer.text):
             await emit(TokenFrame(delta=piece))
+        # Chỉ gắn hành động giao diện khi trả lời bình thường (không từ chối/suy giảm/lỗi): tránh điều hướng kèm một câu từ chối.
+        actions = [] if degraded or answer.verdict in ("refused", "error_fallback") else [Action(**a) for a in ctx.actions]
         usage = Usage(prompt_tokens=trace.prompt_tokens or None, completion_tokens=trace.completion_tokens or None, provider=trace.provider, model=trace.model)
         await emit(
             FinalFrame(
                 answer=answer.text, citations=answer.citations, verdict=answer.verdict, degraded=degraded, usage=usage, trace_id=trace.trace_id,
+                actions=actions,
             )
         )  # fmt: skip
         trace.step("final", answer.verdict)
@@ -251,8 +271,12 @@ _POLICY_NUDGE = (
 
 
 def _policy_lookup_nudge(ctx: TurnContext) -> str | None:
-    """Câu hỏi cá nhân mà mới gọi get_my_* (chưa search_policy): nhắc tra quy định một lần trước khi trả lời."""
+    """Sinh viên hỏi cá nhân mà mới gọi get_my_* (chưa search_policy): nhắc tra quy định một lần trước khi trả lời.
+
+    Giảng viên/quản trị viên hỏi số liệu thì không cần tra quy định nên không nhắc."""
+    if ctx.actor_role != "student":
+        return None
     names = [call["name"] for call in ctx.trace.tool_calls]
-    if any(n.startswith("get_my_") for n in names) and "search_policy" not in names and "get_policy_clause" not in names:
+    if any(n in ctx.data_tool_names for n in names) and "search_policy" not in names and "get_policy_clause" not in names:
         return _POLICY_NUDGE
     return None

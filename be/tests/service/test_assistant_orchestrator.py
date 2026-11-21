@@ -235,3 +235,51 @@ async def test_duplicate_turn_id_is_rejected():
         await orchestrator.run_turn(STUDENT_A, "1", "t1", "hỏi lại", sink)
     assert sink.frames[0]["code"] == "invalid_frame" and "turn_id" in sink.frames[0]["message"]
     assert len(chats.messages) == 2
+
+
+# ---- hành động giao diện (điều hướng) trong `final` ----
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, []),
+        ("navigate", []),
+        ([], []),
+        ([{"type": "navigate", "page": "outline", "label": "Đề cương"}], [{"type": "navigate", "page": "outline", "label": "Đề cương"}]),
+        ([{"type": "navigate", "page": "outline", "label": "Đề cương", "href": "https://evil.example"}], [{"type": "navigate", "page": "outline", "label": "Đề cương"}]),
+        ([{"type": "open_url", "page": "outline", "label": "x"}], []),
+        ([{"type": "navigate", "page": "../admin", "label": "x"}], []),
+        ([{"type": "navigate", "page": "Outline", "label": "x"}], []),
+        ([{"type": "navigate", "page": "a" * 41, "label": "x"}], []),
+        ([{"type": "navigate", "page": "outline", "label": "x" * 81}], []),
+        ([{"type": "navigate", "page": "outline", "label": ""}], []),
+        ([{"type": "navigate", "page": 3, "label": "x"}], []),
+        (
+            [{"type": "navigate", "page": "../x", "label": "bad"}, {"type": "navigate", "page": "journal", "label": "Nhật ký"}, {"type": "navigate", "page": "grades", "label": "Bảng điểm"}],
+            [{"type": "navigate", "page": "journal", "label": "Nhật ký"}],
+        ),
+    ],
+)
+def test_valid_actions_filters_and_limits_to_one(raw, expected):
+    from vin15.service.agent.assistant_orchestrator import valid_actions
+
+    assert valid_actions(raw) == expected
+
+
+@pytest.mark.anyio
+async def test_final_forwards_only_valid_navigate_action_and_does_not_store_it():
+    final = {**FINAL, "actions": [{"type": "navigate", "page": "outline", "label": "Đề cương", "x": 1}, {"type": "navigate", "page": "bad/key", "label": "y"}]}
+    async with fake_agent(script({"type": "ready"}, final)) as url:
+        orchestrator, chats, _ = make(url)
+        sink = Sink()
+        await orchestrator.run_turn(STUDENT_A, None, "t1", "mở trang đề cương", sink)
+    assert sink.frames[-1]["actions"] == [{"type": "navigate", "page": "outline", "label": "Đề cương"}]
+    assert "actions" not in chats.messages[-1].trace and "outline" not in json.dumps(chats.messages[-1].trace)
+
+
+@pytest.mark.anyio
+async def test_final_without_actions_gets_empty_list():
+    async with fake_agent(script({"type": "ready"}, FINAL)) as url:
+        orchestrator, _, _ = make(url)
+        sink = Sink()
+        await orchestrator.run_turn(STUDENT_A, None, "t1", "hỏi", sink)
+    assert sink.frames[-1]["actions"] == []

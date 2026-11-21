@@ -1,7 +1,7 @@
 """``/api/agent-tools/*``: công cụ **chỉ-đọc** cho agent (hợp đồng: .kiro/specs/agent-hoi-dap/contract.md mục 5).
 
 Xác thực: service token + ``X-On-Behalf-Of`` (agent-token), hoặc người dùng mặc định ở dev. Không endpoint nào nhận tham số chủ thể.
-Chỉ GET, ngoại trừ POST tìm kiếm quy định (không có tác dụng phụ ngoài audit). Lỗi trả ``{"error": {"code", "message"}}`` đúng hợp đồng.
+Chỉ GET (``me/*`` cho sinh viên, ``staff/*`` cho giảng viên/quản trị viên), ngoại trừ POST tìm kiếm quy định (không có tác dụng phụ ngoài audit). Lỗi trả ``{"error": {"code", "message"}}`` đúng hợp đồng.
 """
 
 from __future__ import annotations
@@ -32,6 +32,10 @@ from vin15.presentation.dto.agent_tools import (
     MeRequestsResponse,
     PolicySearchRequest,
     PolicySearchResponse,
+    StaffDashboardResponse,
+    StaffFlagsResponse,
+    StaffInternshipsResponse,
+    StaffQueueResponse,
 )
 
 from .dependencies import agent_subject, container
@@ -107,3 +111,33 @@ def my_credit_checklist(
 @router.get("/me/requests", response_model=MeRequestsResponse, summary="Yêu cầu gia hạn/ngoại lệ của người hỏi")
 def my_requests(subject: AgentToolSubject = Depends(agent_subject), app: Container = Depends(container)) -> MeRequestsResponse:
     return MeRequestsResponse.of(app.agent_tool_service.my_requests(subject))
+
+
+@router.get("/staff/queue", response_model=StaffQueueResponse, summary="Hàng chờ cần xử lý của giảng viên/quản trị viên (theo phạm vi)")
+def staff_queue(subject: AgentToolSubject = Depends(agent_subject), app: Container = Depends(container)) -> StaffQueueResponse:
+    return StaffQueueResponse.model_validate(app.agent_tool_service.staff_queue(subject))
+
+
+@router.get("/staff/flags", response_model=StaffFlagsResponse, summary="Cờ rủi ro trong phạm vi (lọc theo trạng thái)")
+def staff_flags(
+    status: str | None = None, subject: AgentToolSubject = Depends(agent_subject), app: Container = Depends(container)
+) -> StaffFlagsResponse:
+    return StaffFlagsResponse.model_validate(app.agent_tool_service.staff_flags(subject, status))
+
+
+@router.get("/staff/dashboard", response_model=StaffDashboardResponse, summary="Số liệu tổng hợp trong phạm vi")
+def staff_dashboard(
+    cohort: str | None = None, subject: AgentToolSubject = Depends(agent_subject), app: Container = Depends(container)
+) -> StaffDashboardResponse:
+    return StaffDashboardResponse.model_validate(app.agent_tool_service.staff_dashboard(subject, cohort))
+
+
+@router.get("/staff/internships", response_model=StaffInternshipsResponse, summary="Danh sách hồ sơ trong phạm vi (lọc trạng thái/quá hạn)")
+def staff_internships(
+    status: str | None = None,
+    overdue_only: bool = False,
+    cohort: str | None = None,
+    subject: AgentToolSubject = Depends(agent_subject),
+    app: Container = Depends(container),
+) -> StaffInternshipsResponse:
+    return StaffInternshipsResponse.model_validate(app.agent_tool_service.staff_internships(subject, status, overdue_only, cohort))

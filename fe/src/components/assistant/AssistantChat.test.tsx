@@ -2,7 +2,13 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CITATION, FakeSocket, finalFrame, turnFrame } from "@/lib/assistant/testing";
+import { UserContext } from "@/lib/user-context";
 import AssistantChat from "./AssistantChat";
+import AssistantProvider from "./AssistantProvider";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/assistant" }));
+
+const USER = { id: "3", email: "sv.a@example.test", full_name: "Sinh viên A (mẫu)", role: "student" } as const;
 
 const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
@@ -31,16 +37,20 @@ const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
 
 function renderChat() {
   return render(
-    <AssistantChat
-      options={{
-        wsUrl: "ws://test/ws",
-        createSocket: (url) => new FakeSocket(url) as unknown as WebSocket,
-        fetchImpl,
-        newTurnId: () => "t1",
-        pingMs: 0,
-        backoffMs: [],
-      }}
-    />,
+    <UserContext.Provider value={USER}>
+      <AssistantProvider
+        options={{
+          wsUrl: "ws://test/ws",
+          createSocket: (url: string) => new FakeSocket(url) as unknown as WebSocket,
+          fetchImpl,
+          newTurnId: () => "t1",
+          pingMs: 0,
+          backoffMs: [],
+        }}
+      >
+        <AssistantChat />
+      </AssistantProvider>
+    </UserContext.Provider>,
   );
 }
 
@@ -157,7 +167,8 @@ describe("AssistantChat", () => {
   it("danh sách hội thoại cũ: mở một hội thoại hiển thị lịch sử có chip trích dẫn", async () => {
     const user = userEvent.setup();
     renderChat();
-    await user.click(await screen.findByRole("button", { name: /Hạn nộp đề cương/ }));
+    const list = within(await screen.findByRole("navigation", { name: "Hội thoại" }));
+    await user.click(await list.findByRole("button", { name: /Hạn nộp đề cương/ }));
     expect(await screen.findByText("Câu hỏi cũ")).toBeInTheDocument();
     expect(screen.getByText(/Chế độ hạn chế/)).toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "Điều 5 khoản 2 · QC-01" })[0]);

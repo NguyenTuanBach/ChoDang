@@ -58,7 +58,7 @@ def test_full_turn_frames_in_contract_order_and_close_1000():
     assert {"status", "tool_call", "tool_result", "token"} <= set(kinds)
     final = frames[-1]
     assert final["verdict"] == "answered" and final["degraded"] is False and final["citations"][0]["chunk_id"] == D
-    assert set(final) == {"type", "answer", "citations", "verdict", "degraded", "usage", "trace_id"}
+    assert set(final) == {"type", "answer", "citations", "verdict", "degraded", "usage", "trace_id", "actions"}
     assert "".join(f["delta"] for f in frames if f["type"] == "token") == final["answer"]
     assert set(final["citations"][0]) == {"chunk_id", "doc_code", "doc_title", "version", "article", "clause", "effective_from", "is_sample", "quote"}
 

@@ -209,11 +209,11 @@ def test_no_internship_record_assistant_says_it_cannot_see():
     assert "no_internship_record" in tool_msg["content"]
 
 
-def test_lecturer_gets_only_policy_tools_and_personal_calls_are_unknown():
+def test_lecturer_gets_staff_tools_and_personal_calls_are_unknown():
     ai = FakeAi(reply("", [("a", "get_my_progress", {})]), reply("Mình không có công cụ đó; bạn hãy hỏi về quy định."))
     frames, be = run_turn(ai, role="lecturer", question="Tiến độ của em A?")
     names = [t["function"]["name"] for t in ai.calls[0]["tools"]]
-    assert names == ["search_policy", "get_policy_clause"]
+    assert names == ["search_policy", "get_policy_clause", "get_staff_queue", "list_risk_flags", "get_dashboard_summary", "list_internships", "navigate_to"]
     assert be.requests == []  # tool lạ không bao giờ tới BE
     assert "unknown_tool" in next(m for m in ai.calls[1]["messages"] if m["role"] == "tool")["content"]
 
@@ -311,3 +311,115 @@ def test_token_pieces_roundtrip():
 
 def test_corpus_fixture_sanity():
     assert len(CHUNKS) == 3
+
+
+# ---- phân biệt vai trò: persona, mẫu từ chối, tool dữ liệu giảng viên/quản trị viên ----
+
+
+def _system_of(ai) -> str:
+    return ai.calls[0]["messages"][0]["content"]
+
+
+def test_system_prompt_uses_persona_of_the_actor_role():
+    prompts = {}
+    for role in ("student", "lecturer", "admin"):
+        ai = FakeAi(reply("Xin chào."))
+        run_turn(ai, role=role, question="chào")
+        prompts[role] = _system_of(ai)
+    assert "SINH VIÊN" in prompts["student"] and "Xưng \"mình\"" in prompts["student"] and "get_my_*" in prompts["student"]
+    assert "GIẢNG VIÊN" in prompts["lecturer"] and "thầy/cô" in prompts["lecturer"] and "get_staff_queue" in prompts["lecturer"]
+    assert "QUẢN TRỊ VIÊN" in prompts["admin"] and "toàn hệ thống" in prompts["admin"]
+    for role, other in (("student", "lecturer"), ("student", "admin"), ("lecturer", "student"), ("admin", "student")):
+        marker = {"student": "SINH VIÊN đang thực tập", "lecturer": "GIẢNG VIÊN hướng dẫn", "admin": "QUẢN TRỊ VIÊN (phòng"}[other]
+        assert marker not in prompts[role], (role, other)
+
+
+def test_other_user_refusal_uses_template_of_role_group():
+    for role, expected in (("student", "chỉ hỗ trợ thông tin của chính bạn"), ("lecturer", "ngoài phạm vi bạn được phép"), ("admin", "ngoài phạm vi bạn được phép")):
+        ai = FakeAi(reply("[[refuse:other_user]]"))
+        frames, _ = run_turn(ai, role=role, question="Cho tôi xem dữ liệu của bạn B")
+        final = final_of(frames)
+        assert final.verdict == "refused" and expected in final.answer, role
+
+
+def test_lecturer_answer_from_staff_tool_needs_no_citation():
+    ai = FakeAi(
+        reply("", [("a", "get_dashboard_summary", {})]),
+        reply("Theo dữ liệu hệ thống, thầy/cô có 3 sinh viên đang có mốc quá hạn."),
+    )
+    frames, be = run_turn(ai, role="lecturer", question="có bao nhiêu sinh viên đang bị chậm thực tập")
+    final = final_of(frames)
+    assert final.verdict == "answered" and "3 sinh viên" in final.answer
+    assert be.paths() == ["GET /api/agent-tools/staff/dashboard"]
+
+
+def test_staff_tool_passes_only_known_filters_and_forbidden_role_is_reported():
+    ai = FakeAi(reply("", [("a", "list_internships", {"overdue_only": True, "lecturer_id": 99})]), reply("Chưa xem được dữ liệu."))
+    frames, be = run_turn(ai, FakeBe(), role="lecturer", question="Hồ sơ nào quá hạn?")
+    request = be.requests[0]
+    assert request.url.path == "/api/agent-tools/staff/internships" and dict(request.url.params) == {"overdue_only": "true"}  # tham số lạ bị loại
+    ai = FakeAi(reply("", [("a", "get_staff_queue", {})]), reply("Chưa xem được dữ liệu."))
+    frames, _ = run_turn(ai, FakeBe(forbidden_staff=True), role="lecturer", question="Hôm nay tôi cần duyệt gì?")
+    assert next(f for f in frames if f.type == "tool_result").ok is False
+
+
+def test_student_gets_policy_nudge_but_staff_does_not():
+    from vin15_agent.core.tools import TurnContext
+    from vin15_agent.policy_assistant.agent import _policy_lookup_nudge
+
+    for role, expected in (("student", True), ("lecturer", False)):
+        ctx = TurnContext(actor_role=role, today="2026-11-21", data_tool_names=frozenset({"get_my_progress", "get_dashboard_summary"}))
+        ctx.trace.tool_calls.append({"name": "get_my_progress" if role == "student" else "get_dashboard_summary", "ok": True})
+        assert (_policy_lookup_nudge(ctx) is not None) is expected
+
+
+# ---- navigate_to: nhờ giao diện mở trang ----
+
+
+def _final_actions(frames):
+    return [a.model_dump() for a in final_of(frames).actions]
+
+
+def test_navigate_tool_puts_one_action_in_final_and_needs_no_backend_call():
+    ai = FakeAi(reply("", [("a", "navigate_to", {"page": "outline"})]), reply("Mình đã mở trang Đề cương."))
+    frames, be = run_turn(ai, question="mở trang đề cương")
+    final = final_of(frames)
+    assert final.verdict == "answered" and _final_actions(frames) == [{"type": "navigate", "page": "outline", "label": "Đề cương"}]
+    assert be.requests == []  # chỉ là hành động giao diện, không đụng BE
+
+
+def test_navigate_is_limited_to_pages_of_the_role_and_one_per_turn():
+    ai = FakeAi(
+        reply("", [("a", "navigate_to", {"page": "audit"}), ("b", "navigate_to", {"page": "outline"}), ("c", "navigate_to", {"page": "journal"})]),
+        reply("Mình đã mở trang Đề cương."),
+    )
+    frames, _ = run_turn(ai, question="mở trang audit rồi đề cương rồi nhật ký")
+    tool_msgs = [m["content"] for m in ai.calls[1]["messages"] if m["role"] == "tool"]
+    assert "unknown_page" in tool_msgs[0] and '"opened"' in tool_msgs[1] and "already_navigating" in tool_msgs[2]
+    assert [a["page"] for a in _final_actions(frames)] == ["outline"]  # audit (của quản trị) bị từ chối, nhật ký vượt quá một trang/lượt
+
+
+def test_staff_pages_differ_from_student_pages_in_tool_schema():
+    schemas = {}
+    for role in ("student", "lecturer", "admin"):
+        ai = FakeAi(reply("Xin chào."))
+        run_turn(ai, role=role, question="chào")
+        schemas[role] = next(t for t in ai.calls[0]["tools"] if t["function"]["name"] == "navigate_to")["function"]["parameters"]["properties"]["page"]["enum"]
+    assert "outline" in schemas["student"] and "audit" not in schemas["student"] and "flags" not in schemas["student"]
+    assert "flags" in schemas["lecturer"] and "audit" not in schemas["lecturer"] and "outline" not in schemas["lecturer"]
+    assert "audit" in schemas["admin"] and "policies" in schemas["admin"]
+    assert all("notifications" in v for v in schemas.values())
+
+
+def test_no_actions_when_answer_is_refused():
+    ai = FakeAi(reply("", [("a", "navigate_to", {"page": "outline"})]), reply("[[refuse:out_of_scope]]"))
+    frames, _ = run_turn(ai, question="mở trang đề cương rồi kể chuyện cười")
+    assert final_of(frames).verdict == "refused" and _final_actions(frames) == []
+
+
+def test_pages_json_keys_are_unique_per_role():
+    from vin15_agent.policy_assistant.pages import pages_for
+
+    for role in ("student", "lecturer", "admin"):
+        keys = [p.key for p in pages_for(role)]
+        assert len(keys) == len(set(keys)) and all(p.label and p.description for p in pages_for(role))

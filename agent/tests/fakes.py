@@ -39,14 +39,23 @@ PERSONAL_DATA: dict[str, dict[str, Any]] = {
 }  # fmt: skip
 
 
+STAFF_DATA: dict[str, dict[str, Any]] = {
+    "queue": {"total": 2, "items": [{"kind": "milestone_submitted", "internship_id": 7, "student_name": "Nguyễn Văn A", "title": "Báo cáo giữa kỳ chờ chấp nhận", "since": "2026-11-18", "due_date": "2026-11-20", "severity": None, "priority": 40}]},
+    "flags": {"total": 1, "items": [{"id": 3, "internship_id": 7, "student_name": "Nguyễn Văn A", "kind": "overdue_milestone", "severity": "warning", "status": "open", "reason": "Mốc M3 quá hạn 1 ngày", "created_at": "2026-11-21"}]},
+    "dashboard": {"scope": "sinh viên bạn phụ trách", "active_internships": 12, "late_internships": 3, "internships_by_status": {"in_progress": 12}, "milestones_by_status": {"pending": 20}, "open_flags_by_severity": {"warning": 2}, "credit_outcomes": {}},
+    "internships": {"total": 1, "items": [{"id": 7, "cohort": "K2026", "status": "in_progress", "student_name": "Nguyễn Văn A", "company_name": "Công ty X", "start_date": "2026-09-01", "end_date": "2026-11-30", "overdue_milestones": 1, "submitted_milestones": 1, "open_flags": 1}]},
+}  # fmt: skip
+
+
 class FakeBe:
     """BE giả: kho quy định nhỏ + dữ liệu cá nhân. ``requests`` ghi lại mọi lời gọi (đã nhận qua transport)."""
 
-    def __init__(self, chunks=None, personal="default", service_token="tok", *, forbidden_personal=False, fail_status: int | None = None) -> None:
+    def __init__(self, chunks=None, personal="default", service_token="tok", *, forbidden_personal=False, forbidden_staff=False, fail_status: int | None = None) -> None:
         self.chunks = list(CHUNKS if chunks is None else chunks)
         self.personal = PERSONAL_DATA if personal == "default" else personal
         self.service_token = service_token
         self.forbidden_personal = forbidden_personal
+        self.forbidden_staff = forbidden_staff
         self.fail_status = fail_status
         self.requests: list[httpx.Request] = []
 
@@ -83,6 +92,10 @@ class FakeBe:
             if self.personal is None:
                 return httpx.Response(200, json={"available": False, "reason": "no_internship_record"})
             return httpx.Response(200, json=self.personal[path.rsplit("/", 1)[1]])
+        if request.method == "GET" and path.startswith("/api/agent-tools/staff/"):
+            if self.forbidden_staff:
+                return self._err(403, "forbidden_role", "Tool này chỉ dành cho giảng viên và quản trị viên")
+            return httpx.Response(200, json=STAFF_DATA[path.rsplit("/", 1)[1]])
         return self._err(404, "not_found")
 
     def paths(self) -> list[str]:

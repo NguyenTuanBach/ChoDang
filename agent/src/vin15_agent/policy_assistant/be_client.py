@@ -17,6 +17,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 PERSONAL_ENDPOINTS = frozenset({"internship", "milestones", "progress", "credit-checklist", "requests"})
+STAFF_ENDPOINTS = frozenset({"queue", "flags", "dashboard", "internships"})
 _CHUNK_ID = re.compile(r"^[\w@.:/\-]{1,200}$")
 
 _DEFAULT_ERRORS = {
@@ -105,6 +106,13 @@ class BeToolsClient:
         if endpoint not in PERSONAL_ENDPOINTS:
             raise ValueError(f"endpoint cá nhân không hợp lệ: {endpoint}")
         return await self._request("GET", f"/api/agent-tools/me/{endpoint}")
+
+    async def staff(self, endpoint: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Dữ liệu của giảng viên/quản trị viên; phạm vi (sinh viên mình phụ trách hay toàn hệ thống) do BE quyết từ token."""
+        if endpoint not in STAFF_ENDPOINTS:
+            raise ValueError(f"endpoint staff không hợp lệ: {endpoint}")
+        clean = {k: ("true" if v is True else "false" if v is False else v) for k, v in (params or {}).items() if v not in (None, "")}
+        return await self._request("GET", f"/api/agent-tools/staff/{endpoint}", params=clean)
 
 
 BeClientFactory = Callable[[str], BeToolsClient]

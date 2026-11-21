@@ -92,6 +92,14 @@ class Usage(BaseModel):
     model: str | None = None
 
 
+class Action(BaseModel):
+    """Hành động giao diện trợ lý đề nghị (hiện chỉ điều hướng). ``page`` là khóa trang trong ``pages.json``; FE tự đổi sang URL."""
+
+    type: Literal["navigate"] = "navigate"
+    page: str
+    label: str
+
+
 class FinalFrame(BaseModel):
     type: Literal["final"] = "final"
     answer: str
@@ -100,6 +108,7 @@ class FinalFrame(BaseModel):
     degraded: bool = False
     usage: Usage = Field(default_factory=Usage)
     trace_id: str
+    actions: list[Action] = Field(default_factory=list)
 
 
 class ErrorFrame(BaseModel):

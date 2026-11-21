@@ -1,0 +1,37 @@
+{
+  "_doc": "Danh mục trang để trợ lý điều hướng (tool navigate_to). `key` PHẢI khớp `key` trong fe/src/lib/nav.ts (FE có test đối chiếu); FE là nơi duy nhất giữ URL. `common` áp cho mọi vai trò.",
+  "student": [
+    {"key": "overview", "label": "Tổng quan", "description": "trang chủ của sinh viên: hành trình thực tập, việc cần làm, mốc sắp tới"},
+    {"key": "internship", "label": "Hồ sơ", "description": "khai báo và nộp hồ sơ thực tập (doanh nghiệp, thời gian, giấy tiếp nhận)"},
+    {"key": "outline", "label": "Đề cương", "description": "soạn và nộp đề cương thực tập"},
+    {"key": "milestones", "label": "Mốc & minh chứng", "description": "các mốc thực tập và nộp minh chứng theo mốc"},
+    {"key": "journal", "label": "Nhật ký", "description": "nhật ký thực tập hằng tuần"},
+    {"key": "requests", "label": "Gia hạn / ngoại lệ", "description": "tạo yêu cầu gia hạn mốc hoặc xử lý ngoại lệ"},
+    {"key": "final", "label": "Kết thúc & tín chỉ", "description": "kết thúc đợt thực tập, điều kiện và kết quả công nhận tín chỉ"},
+    {"key": "grades", "label": "Bảng điểm", "description": "bảng điểm và kết quả đã đồng bộ"}
+  ],
+  "lecturer": [
+    {"key": "queue", "label": "Hàng chờ", "description": "trang chủ của giảng viên: việc cần duyệt, theo thứ tự ưu tiên"},
+    {"key": "students", "label": "Sinh viên", "description": "danh sách sinh viên mình phụ trách"},
+    {"key": "internships", "label": "Hồ sơ", "description": "danh sách hồ sơ thực tập trong phạm vi phụ trách"},
+    {"key": "requests", "label": "Yêu cầu", "description": "yêu cầu gia hạn/ngoại lệ chờ xử lý"},
+    {"key": "flags", "label": "Cờ rủi ro", "description": "cờ rủi ro (mốc quá hạn, thiếu nhật ký, minh chứng yếu)"},
+    {"key": "dashboard", "label": "Dashboard", "description": "số liệu tổng hợp và báo cáo"}
+  ],
+  "admin": [
+    {"key": "queue", "label": "Hàng chờ", "description": "trang chủ của quản trị viên: việc cần xử lý"},
+    {"key": "internships", "label": "Hồ sơ", "description": "hồ sơ thực tập toàn khóa"},
+    {"key": "requests", "label": "Yêu cầu", "description": "yêu cầu gia hạn/ngoại lệ"},
+    {"key": "credit", "label": "Tín chỉ", "description": "phê duyệt công nhận tín chỉ"},
+    {"key": "accounts", "label": "Tài khoản", "description": "quản lý tài khoản giảng viên và sinh viên"},
+    {"key": "config", "label": "Cấu hình", "description": "cấu hình mốc, chuẩn đầu ra, loại ngoại lệ"},
+    {"key": "policies", "label": "Quy định", "description": "nạp, xem trước và xuất bản văn bản quy định"},
+    {"key": "lms", "label": "LMS", "description": "đồng bộ điểm/tín chỉ sang LMS"},
+    {"key": "dashboard", "label": "Dashboard", "description": "số liệu tổng hợp và báo cáo"},
+    {"key": "audit", "label": "Audit", "description": "nhật ký kiểm toán hệ thống"}
+  ],
+  "common": [
+    {"key": "notifications", "label": "Thông báo", "description": "danh sách thông báo của tôi"},
+    {"key": "assistant", "label": "Trợ lý", "description": "trang trò chuyện với Trợ lý toàn màn hình"}
+  ]
+}
