@@ -399,6 +399,24 @@ Khi `LlmUnavailableError` (hoặc không đường LLM nào hỗ trợ tool): ag
 
 Theo `CLAUDE.md`, thứ tự dự kiến là auth → state machine → luồng dọc. P0 làm được ngay vì độc lập BE; P1 cần ít nhất auth/QTV.
 
+### 10.1. Tiến độ (cập nhật 2026-11-21)
+
+| GĐ | Trạng thái | Căn cứ / còn thiếu |
+|---|---|---|
+| P0 | **Xong** | `core/{ai_client,agent_loop,tools,pii,prompts,tracing}.py`, prompt trong `agent/prompts/`; `agent/` có 197 test qua, kiến trúc được test kiểm. |
+| P1 | **Xong (chạy với seed)** | Migration `V2`, nạp/xuất bản/tìm kiếm lai, `/api/agent-tools/policy/*`, tool `search_policy`/`get_policy_clause`. Quy chế là **bản mẫu** (`is_sample`). Embedding chưa có trên Supabase (agent từng lỗi kết nối OpenAI lúc seed): chạy lại `make seed-dev` để bù. |
+| P2 | **Xong, mới thử tay** | WebSocket agent + BE, `V3` lưu hội thoại, trang `/assistant` ở FE, trích dẫn, chế độ suy giảm. Đã chạy qua `start.sh` với LLM thật (`verdict=answered`); chưa có test E2E tự động qua FE. |
+| P3 | **Xong phần khung** | `V4` (hồ sơ thực tập tối thiểu), seed, 5 tool `get_my_*`, người dùng dev mặc định (`start.sh` tự đặt `sv.a@example.test` khi không production). Chưa có đăng nhập thật. **Còn mở**: có lượt hỏi cá nhân mà model không gọi tool nào (`tools=0`); cần kiểm tra bằng câu hỏi như "Hồ sơ thực tập của tôi thế nào?". Không có tool nào trả họ tên/email/SĐT (cố ý, mục 8). |
+| P4 | **Mới có khung** | `agent/tests/eval/cases.yaml`, `make agent-eval`. Chưa chạy bộ đánh giá bằng LLM thật, chưa chỉnh τ/prompt, chưa đo chỉ số mục 11. |
+
+**Việc tiếp theo (theo thứ tự):**
+1. Chạy lại `make seed-dev` khi agent gọi được OpenAI để có embedding; thử lại tìm kiếm lai.
+2. Sửa/kiểm lượt hỏi cá nhân không gọi `get_my_*` (prompt hoặc cách chọn tool), thêm ca vào bộ eval.
+3. Chạy `make agent-eval` bằng LLM thật, đối chiếu chỉ số mục 11 (trích đúng ≥ 90%, đối kháng 100%), chỉnh τ/prompt.
+4. Chạy và sửa test BE/FE đầy đủ (`make test`); test BE có phần cần DB và chạy rất chậm khi nối Supabase từ xa, nên cân nhắc dùng Postgres local (`make db-up`, `make be-test-db`).
+5. Quay lại thứ tự gốc: auth thật (thay người dùng dev mặc định) → state machine → luồng dọc đầu tiên (hồ sơ thực tập, đề cương) → thay dữ liệu giả của `V4` bằng bảng thật.
+6. Chốt các câu hỏi mở ở mục 12 (model chính, lưu hội thoại bao lâu, định dạng văn bản quy chế, mã sinh viên).
+
 ## 11. Kiểm thử và đánh giá
 
 - **Unit (LLM giả, tất định)**: vòng lặp gọi tool và dừng; giới hạn vòng/thời gian; hậu kiểm bắt id trích dẫn bịa; che PII; suy giảm khi LLM sập; chuyển endpoint dự phòng.

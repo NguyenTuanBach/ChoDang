@@ -36,6 +36,11 @@ class FakeUsers:
     def find_by_email(self, email):
         return next((u for u in self._users.values() if u.email == email.strip().lower()), None)
 
+    def list_by_email_suffix(self, suffix):
+        order = {Role.ADMIN: 0, Role.LECTURER: 1, Role.STUDENT: 2}
+        found = [u for u in self._users.values() if u.email.endswith(suffix.strip().lower())]
+        return sorted(found, key=lambda u: (order[u.role], u.email))
+
 
 class FakeAudit:
     def __init__(self):

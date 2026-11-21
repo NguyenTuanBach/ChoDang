@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from tests.conftest import make_settings
+from tests.conftest import make_settings, session_client
 from tests.fakes import ADMIN, LECTURER, STUDENT_A, STUDENT_B, TODAY, FakeChats, FakeUsers
 from vin15.config.container import Container
 from vin15.main import create_app
@@ -65,7 +65,7 @@ class FakeOrchestrator:
 
 def build(**overrides):
     settings = make_settings(
-        agent_dev_default_user_email="sv.a@example.test", jwt_secret="j" * 40, assistant_ws_auth_seconds=0.5, **overrides
+        jwt_secret="j" * 40, assistant_ws_auth_seconds=0.5, **overrides
     )
     container = Container(settings)
     container.clock = lambda: TODAY
@@ -82,7 +82,7 @@ def container():
 
 @pytest.fixture
 def client(container):
-    with TestClient(create_app(container.settings, container)) as test_client:
+    with session_client(container) as test_client:
         yield test_client
 
 
@@ -123,7 +123,7 @@ def expect_close(ws, code):
 
 
 # ---- Vé ----
-def test_ws_ticket_for_dev_default_user_has_contract_shape(client, container):
+def test_ws_ticket_for_session_user_has_contract_shape(client, container):
     body = client.post("/api/assistant/ws-ticket").json()
     assert set(body) == {"ticket", "expires_in"} and body["expires_in"] == 30 and len(body["ticket"]) >= 24
     assert container.ws_ticket_store.consume(body["ticket"]) == STUDENT_A.id
@@ -135,9 +135,9 @@ def test_ws_ticket_with_session_token_uses_that_user(client, container):
     assert container.ws_ticket_store.consume(t) == STUDENT_B.id
 
 
-def test_ws_ticket_requires_a_user_outside_dev():
+def test_ws_ticket_requires_a_session():
     container = build()
-    settings = make_settings(jwt_secret="j" * 40)  # không có người dùng mặc định
+    settings = make_settings(jwt_secret="j" * 40)  # không có phiên
     other = Container(settings)
     other.user_repository = container.user_repository
     with TestClient(create_app(settings, other)) as client:
@@ -158,7 +158,7 @@ def test_disallowed_origin_is_refused_at_handshake(client):
 
 def test_missing_origin_allowed_in_dev_but_not_in_production():
     dev = build()
-    with TestClient(create_app(dev.settings, dev)) as client:
+    with session_client(dev) as client:
         t = ticket(client)
         with client.websocket_connect("/api/assistant/ws") as ws:
             ws.send_json({"type": "auth", "ticket": t})
@@ -280,7 +280,7 @@ def test_turn_keeps_running_and_finishes_after_frontend_drops(client, container)
 
 def test_ask_rate_limit_returns_rate_limited_without_calling_agent():
     container = build(assistant_ask_per_minute=2)
-    with TestClient(create_app(container.settings, container)) as client:
+    with session_client(container) as client:
         ws = authed(client)
         for i in range(2):
             ask(ws, "hỏi", f"t{i}")
@@ -296,7 +296,7 @@ def test_ask_rate_limit_returns_rate_limited_without_calling_agent():
 
 def test_connection_limit_per_user_closes_4429():
     container = build(assistant_max_connections_per_user=1)
-    with TestClient(create_app(container.settings, container)) as client:
+    with session_client(container) as client:
         first = authed(client)
         t = ticket(client)
         with open_ws(client) as second:
@@ -312,7 +312,7 @@ def test_connection_limit_per_user_closes_4429():
 def test_connection_limit_is_per_user():
     container = build(assistant_max_connections_per_user=1)
     token_b = container.token_service.create(STUDENT_B.id, "student")
-    with TestClient(create_app(container.settings, container)) as client:
+    with session_client(container) as client:
         a = authed(client)
         b = authed(client, {"Authorization": f"Bearer {token_b}"})
         finish(a)
@@ -346,7 +346,7 @@ def test_invalid_frames_get_error_without_closing(client, container):
 
 def test_oversized_frame_closes_1009():
     container = build(assistant_max_frame_bytes=1000)
-    with TestClient(create_app(container.settings, container)) as client:
+    with session_client(container) as client:
         ws = authed(client)
         ws.send_text(json.dumps({"type": "ask", "turn_id": "t1", "question": "x" * 2000}))
         expect_close(ws, 1009)

@@ -14,13 +14,16 @@
 
 ## Trạng thái hiện tại (cập nhật khi đổi)
 
-Mới có **khung**, chưa có tính năng nghiệp vụ nào:
-- **Có**: BE health + `GET /api/agent/health`; `Database` + `SqlMigrator`; token HS256; xử lý lỗi, rate limit; migration `V1__baseline`
-  (`app_user`, `audit_event` chỉ-thêm, RLS); agent `GET /healthz`, `GET /v1/info`; `AiClient` (OpenAI trực tiếp, proxy dự phòng);
-  FE `fe/` mới có một trang kiểm tra kết nối tới BE và agent (chưa có màn hình nghiệp vụ, chưa có đăng nhập).
-- **Chưa có** (thư mục/docstring rỗng): 15 gói `be/.../service/*` (trừ health), `domain/statemachine` (mới có README), auth/đăng nhập,
-  `infrastructure/{mail,oauth,storage}`, bảng nghiệp vụ, mọi agent thật (giám sát, trợ lý chính sách, tiền thẩm), che PII trước khi gửi LLM.
-- **Thứ tự làm dự kiến**: auth → state machine → luồng dọc đầu tiên (hồ sơ thực tập, đề cương) → agent.
+Có **khung** và **một tính năng đầu tiên: Trợ lý chính sách** (kế hoạch và tiến độ P0–P4 ở `docs/thiet-ke-agent-hoi-dap.md` mục 10):
+- **Có**: khung BE/agent (`Database` + `SqlMigrator`, token HS256, lỗi, rate limit, `AiClient`); migration `V1`–`V4` (người dùng, audit, kho quy định,
+  hội thoại, hồ sơ thực tập tối thiểu; RLS); BE: kho quy định (nạp/xuất bản/tìm kiếm lai), `/api/agent-tools/*`, chat WebSocket `/api/assistant/ws`,
+  seed dev (`make seed-dev`); agent: vòng lặp tool, `search_policy`/`get_policy_clause`/`get_my_*`, che PII, trích dẫn, chế độ suy giảm,
+  bộ eval (`make agent-eval`); FE `fe/`: trang kiểm tra kết nối và chat `/assistant`.
+- **Có thêm**: đăng nhập dev (`/login` → nút "Đăng nhập dev", `POST /api/auth/dev-login`, cookie phiên HttpOnly; chỉ ngoài production), `GET /api/auth/me`, `POST /api/auth/logout`.
+- **Chưa có**: đăng nhập Google thật (`AGENT_DEV_DEFAULT_USER_EMAIL` chỉ còn cho tool agent), `domain/statemachine` (mới có README),
+  `infrastructure/{mail,oauth,storage}`, bảng nghiệp vụ thật (hồ sơ, đề cương...), các agent khác (giám sát, tiền thẩm); quy chế trong DB là **bản mẫu**.
+- **Còn dở**: embedding quy chế (chạy lại `make seed-dev` khi agent gọi được OpenAI); lượt hỏi cá nhân đôi khi không gọi `get_my_*`; chưa chạy eval LLM thật.
+- **Thứ tự làm dự kiến**: hoàn thiện Trợ lý (P3/P4) → auth thật → state machine → luồng dọc đầu tiên (hồ sơ thực tập, đề cương) → agent khác.
 
 ## Current Invariants (để không drift)
 

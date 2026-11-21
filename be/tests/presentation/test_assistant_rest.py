@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import make_settings
+from tests.conftest import make_settings, session_client
 from tests.fake_agent import FINAL, fake_agent_in_thread, script
 from tests.fakes import ADMIN, LECTURER, STUDENT_A, STUDENT_B, TODAY, FakeAudit, FakeChats, FakeUsers
 from vin15.config.container import Container
@@ -16,7 +16,6 @@ ORIGIN = {"origin": "http://localhost:3000"}
 
 def build(agent_url="", **overrides):
     settings = make_settings(
-        agent_dev_default_user_email="sv.a@example.test",
         jwt_secret="j" * 40,
         agent_api_url=agent_url,
         agent_api_service_token="tok",
@@ -54,8 +53,8 @@ def test_list_and_get_own_conversation_have_contract_shape():
     container = build()
     conversation = seed_turn(container, STUDENT_A)
     seed_turn(container, STUDENT_B)
-    client = TestClient(create_app(container.settings, container))
-    listing = client.get("/api/assistant/conversations").json()  # người dùng mặc định = SV A
+    client = session_client(container)
+    listing = client.get("/api/assistant/conversations").json()  # đang đăng nhập = SV A
     assert [c["id"] for c in listing] == [str(conversation.id)] and set(listing[0]) == {"id", "title", "created_at", "updated_at"}
     detail = client.get(f"/api/assistant/conversations/{conversation.id}").json()
     assert set(detail) == {"id", "title", "messages"} and detail["id"] == str(conversation.id)
@@ -72,7 +71,7 @@ def test_list_and_get_own_conversation_have_contract_shape():
 def test_other_users_conversation_is_404_and_not_listed():
     container = build()
     theirs = seed_turn(container, STUDENT_B)
-    client = TestClient(create_app(container.settings, container))
+    client = session_client(container)
     assert client.get(f"/api/assistant/conversations/{theirs.id}").status_code == 404
     assert client.get("/api/assistant/conversations/999").status_code == 404
     assert client.get("/api/assistant/conversations/abc").status_code == 404
@@ -86,8 +85,8 @@ def test_other_users_conversation_is_404_and_not_listed():
 def test_trace_visible_to_owner_and_admin_only():
     container = build()
     seed_turn(container, STUDENT_B, trace_id="tr-b")
-    client = TestClient(create_app(container.settings, container))
-    assert client.get("/api/assistant/traces/tr-b").status_code == 404  # SV A (mặc định) không phải chủ
+    client = session_client(container)
+    assert client.get("/api/assistant/traces/tr-b").status_code == 404  # SV A (đang đăng nhập) không phải chủ
     owner = client.get("/api/assistant/traces/tr-b", headers=bearer(container, STUDENT_B))
     assert owner.status_code == 200 and owner.json()["trace"] == {"trace_id": "tr-b", "steps": []} and owner.json()["turn_id"] == "t1"
     assert client.get("/api/assistant/traces/tr-b", headers=bearer(container, ADMIN)).status_code == 200
@@ -95,7 +94,7 @@ def test_trace_visible_to_owner_and_admin_only():
     assert client.get("/api/assistant/traces/khong-co", headers=bearer(container, ADMIN)).status_code == 404
 
 
-def test_rest_endpoints_need_a_user_when_no_dev_default():
+def test_rest_endpoints_need_a_session():
     container = build()
     settings = make_settings(jwt_secret="j" * 40)
     prod_like = Container(settings)
@@ -118,7 +117,7 @@ def test_end_to_end_ask_streams_saves_and_is_readable_via_rest():
     record = []
     with fake_agent_in_thread(script(*frames, record=record)) as url:
         container = build(url)
-        with TestClient(create_app(container.settings, container)) as client:
+        with session_client(container) as client:
             t = client.post("/api/assistant/ws-ticket").json()["ticket"]
             with client.websocket_connect("/api/assistant/ws", headers=ORIGIN) as ws:
                 ws.send_json({"type": "auth", "ticket": t})
@@ -145,7 +144,7 @@ def test_end_to_end_ask_streams_saves_and_is_readable_via_rest():
 
 def test_end_to_end_agent_down_reports_llm_unavailable_and_second_turn_continues_conversation():
     container = build("http://127.0.0.1:1")
-    with TestClient(create_app(container.settings, container)) as client:
+    with session_client(container) as client:
         t = client.post("/api/assistant/ws-ticket").json()["ticket"]
         with client.websocket_connect("/api/assistant/ws", headers=ORIGIN) as ws:
             ws.send_json({"type": "auth", "ticket": t})
@@ -161,4 +160,4 @@ def test_end_to_end_agent_down_reports_llm_unavailable_and_second_turn_continues
 @pytest.mark.parametrize("path", ["/api/assistant/ws-ticket"])
 def test_ticket_only_via_post(path):
     container = build()
-    assert TestClient(create_app(container.settings, container)).get(path).status_code == 405
+    assert session_client(container).get(path).status_code == 405

@@ -6,14 +6,18 @@ from vin15.domain.model.agent_tool import AgentToolSubject
 from vin15.domain.model.user import User
 
 
+#: Cookie phiên do ``/api/auth/*`` đặt (HttpOnly).
+SESSION_COOKIE = "session"
+
+
 def container(connection: HTTPConnection) -> Container:
     """Dùng được cho cả HTTP lẫn WebSocket."""
     return connection.app.state.container
 
 
 def current_user(request: Request, app: Container = Depends(container)) -> User:
-    """Người dùng của request: token phiên, hoặc người dùng mặc định ở dev (chưa có đăng nhập thật)."""
-    return app.current_user_service.resolve(request.headers.get("authorization"))
+    """Người dùng của request: token phiên trong header Bearer hoặc cookie phiên; không có thì 401."""
+    return app.current_user_service.resolve(request.headers.get("authorization"), request.cookies.get(SESSION_COOKIE))
 
 
 def agent_subject(request: Request, app: Container = Depends(container)) -> AgentToolSubject:

@@ -19,6 +19,7 @@ from .presentation.controller import (
     agent_controller,
     agent_tools_controller,
     assistant_controller,
+    auth_controller,
     health_controller,
     policy_admin_controller,
 )
@@ -70,6 +71,9 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     )
     register_exception_handlers(app)
     app.include_router(health_controller.router)
+    app.include_router(auth_controller.router)
+    if settings.dev_login_enabled:
+        app.include_router(auth_controller.dev_router)
     app.include_router(agent_controller.router)
     app.include_router(agent_tools_controller.router)
     app.include_router(assistant_controller.router)

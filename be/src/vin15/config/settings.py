@@ -118,6 +118,11 @@ class Settings(BaseSettings):
         return [item.strip().lower() for item in self.app_admin_emails.split(",") if item.strip()]
 
     @property
+    def dev_login_enabled(self) -> bool:
+        """Đăng nhập dev (``/api/auth/dev-login``): chỉ có ở môi trường không phải production."""
+        return not self.is_production
+
+    @property
     def dev_default_user_email(self) -> str:
         """Email người dùng mặc định cho tool agent; rỗng nếu không đặt hoặc đang ở production (không bao giờ hiệu lực ở production)."""
         return "" if self.is_production else self.agent_dev_default_user_email.strip().lower()

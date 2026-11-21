@@ -1,7 +1,7 @@
 .layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  height: 100vh;
+  height: calc(100vh - var(--auth-bar-height, 0px));
 }
 
 .layout:has(.panel) {
@@ -53,7 +53,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: 100vh;
+  height: calc(100vh - var(--auth-bar-height, 0px));
 }
 
 .header {
@@ -315,7 +315,7 @@
   border-left: 1px solid var(--border);
   padding: 1rem;
   overflow-y: auto;
-  height: 100vh;
+  height: calc(100vh - var(--auth-bar-height, 0px));
   box-sizing: border-box;
 }
 

@@ -39,3 +39,13 @@ def client_with_agent(handler, **overrides) -> TestClient:
 def anyio_backend() -> str:
     """Test async dùng plugin anyio, chỉ chạy với asyncio (không cài trio)."""
     return "asyncio"
+
+
+def session_client(container: Container, user=None) -> TestClient:
+    """TestClient đã đăng nhập bằng cookie phiên của ``user`` (mặc định SV A). Dùng được cả dạng ``with``."""
+    from tests.fakes import STUDENT_A
+
+    user = user or STUDENT_A
+    client = TestClient(create_app(container.settings, container))
+    client.cookies.set("session", container.token_service.create(user.id, user.role.value))
+    return client

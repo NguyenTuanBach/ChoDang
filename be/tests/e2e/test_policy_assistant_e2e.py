@@ -34,7 +34,7 @@ def test_grounded_question_streams_steps_and_cites_a_real_chunk(fresh):
     assert response.status_code == 200 and response.json()["chunk"]["chunk_id"] == chunk_id
     assert final["citations"][0]["is_sample"] is True
     # Đã lưu: lấy lại qua REST.
-    detail = httpx.get(f"{fresh.be_url}/api/assistant/conversations/{final['conversation_id']}").json()
+    detail = fresh.session.get(f"/api/assistant/conversations/{final['conversation_id']}").json()
     assert [m["role"] for m in detail["messages"]] == ["user", "assistant"] and detail["messages"][1]["content"] == final["answer"]
 
 

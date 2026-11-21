@@ -13,6 +13,7 @@ import subprocess
 import threading
 import time
 import uuid
+from functools import cached_property
 from pathlib import Path
 
 import httpx
@@ -56,9 +57,17 @@ class Stack:
     def __init__(self, fake: FakeOpenAI, agent_url: str, be_url: str, container: Container, database: Database):
         self.fake, self.agent_url, self.be_url, self.container, self.database = fake, agent_url, be_url, container, database
 
+    @cached_property
+    def session(self) -> httpx.Client:
+        """Trình duyệt giả của SV A: đăng nhập dev rồi giữ cookie phiên."""
+        client = httpx.Client(base_url=self.be_url, timeout=10)
+        response = client.post("/api/auth/dev-login", json={"email": STUDENT_A_EMAIL})
+        assert response.status_code == 200, response.text
+        return client
+
     def ask(self, question: str, *, cancel_after_first_frame: bool = False, timeout: float = 30.0) -> list[dict]:
         """Hỏi qua WebSocket FE↔BE như trình duyệt (ticket → auth → ask). Trả mọi khung tới ``final``/``error``."""
-        ticket = httpx.post(f"{self.be_url}/api/assistant/ws-ticket", timeout=10).json()["ticket"]
+        ticket = self.session.post("/api/assistant/ws-ticket").json()["ticket"]
         frames: list[dict] = []
         with connect(self.be_url.replace("http", "ws") + "/api/assistant/ws", origin=ORIGIN, open_timeout=10) as ws:
             ws.send(json.dumps({"type": "auth", "ticket": ticket}))

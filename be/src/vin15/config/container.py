@@ -22,6 +22,7 @@ from vin15.service.agent.assistant_orchestrator import AssistantOrchestrator
 from vin15.service.agent.conversation_service import ConversationService
 from vin15.service.agent.ws_ticket_store import WsTicketStore
 from vin15.service.auth.current_user_service import CurrentUserService
+from vin15.service.auth.dev_login_service import DevLoginService
 from vin15.service.credit.credit_checklist_service import CreditChecklistService
 from vin15.service.health_service import HealthService
 from vin15.service.internship.internship_read_service import InternshipReadService
@@ -125,7 +126,11 @@ class Container:
     # ---- Agent: tool, chủ thể, hội thoại ----
     @cached_property
     def current_user_service(self) -> CurrentUserService:
-        return CurrentUserService(self.token_service, self.user_repository, self.settings.dev_default_user_email)
+        return CurrentUserService(self.token_service, self.user_repository)
+
+    @cached_property
+    def dev_login_service(self) -> DevLoginService:
+        return DevLoginService(self.user_repository, self.token_service, self.audit_repository)
 
     @cached_property
     def agent_subject_resolver(self) -> AgentSubjectResolver:

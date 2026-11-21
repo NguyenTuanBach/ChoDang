@@ -4,6 +4,7 @@
   --border: #e5e5e5;
   --muted: #6b7280;
   --code-bg: #f5f5f5;
+  --auth-bar-height: 2.75rem;
 }
 
 @media (prefers-color-scheme: dark) {
