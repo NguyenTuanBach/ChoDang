@@ -2,7 +2,7 @@
 
 import { AlarmClock, Flag, Hourglass, Inbox, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
-import { Async, Badge, Card, EmptyState, Page, StatCard, StatusBadge } from "@/components/ui/ui";
+import { Async, Badge, Card, EmptyState, Page, StatCard, StatusBadge, outcomeBg } from "@/components/ui/ui";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, QUEUE_KIND, fmtDate, fmtDateTime } from "@/lib/labels";
 import type { Dashboard, QueueItem } from "@/lib/types";
@@ -15,7 +15,8 @@ function linkOf(i: QueueItem, base: "/lecturer" | "/admin") {
   return `${base}/internships/${i.internship_id}`;
 }
 
-const SEGMENT = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4", "bg-chart-5", "bg-muted-foreground"];
+// Hoàn thành = xanh lá, chưa hoàn thành = đỏ.
+const segmentClass = (status: string) => outcomeBg(status);
 
 // Thanh xếp chồng phân bố hồ sơ theo trạng thái + chú giải (màu lấy từ bảng chart của chủ đề).
 function StatusDistribution({ rows }: { rows: { status: string; n: number }[] }) {
@@ -23,15 +24,15 @@ function StatusDistribution({ rows }: { rows: { status: string; n: number }[] })
   if (total === 0) return <EmptyState>Chưa có hồ sơ nào trong phạm vi của bạn.</EmptyState>;
   return (
     <div>
-      <div className="flex h-3 overflow-hidden rounded-full bg-muted" role="img" aria-label="Phân bố hồ sơ theo trạng thái">
-        {rows.map((r, i) => (
-          <span key={r.status} className={SEGMENT[i % SEGMENT.length]} style={{ width: `${(r.n / total) * 100}%` }} title={`${INTERNSHIP_STATUS[r.status] ?? r.status}: ${r.n}`} />
+      <div className="flex h-3 overflow-hidden rounded-full border border-foreground/25 bg-muted" role="img" aria-label="Phân bố hồ sơ theo trạng thái">
+        {rows.map((r) => (
+          <span key={r.status} className={segmentClass(r.status)} style={{ width: `${(r.n / total) * 100}%` }} title={`${INTERNSHIP_STATUS[r.status] ?? r.status}: ${r.n}`} />
         ))}
       </div>
       <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-x-4 gap-y-1.5 p-0 text-sm sm:grid-cols-2">
-        {rows.map((r, i) => (
+        {rows.map((r) => (
           <li key={r.status} className="flex items-center gap-2">
-            <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", SEGMENT[i % SEGMENT.length])} />
+            <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", segmentClass(r.status))} />
             <span className="min-w-0 flex-1 truncate">{INTERNSHIP_STATUS[r.status] ?? r.status}</span>
             <strong className="tabular-nums">{r.n}</strong>
           </li>
@@ -94,8 +95,8 @@ export default function QueuePanel({ base }: { base: "/lecturer" | "/admin" }) {
                           <Link
                             href={linkOf(i, base)}
                             className={cn(
-                              "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-l-4 border-border bg-background px-4 py-3 text-foreground no-underline transition-colors hover:bg-muted",
-                              urgent ? "border-l-destructive" : soon ? "border-l-orange-500" : "border-l-border",
+                              "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border-2 border-foreground/25 bg-background px-3 py-2.5 text-foreground no-underline transition-colors hover:bg-muted",
+                              urgent ? "border-l-[6px] border-l-destructive" : soon ? "border-l-[6px] border-l-orange-500" : "",
                             )}
                           >
                             <span className="min-w-0 flex-1">

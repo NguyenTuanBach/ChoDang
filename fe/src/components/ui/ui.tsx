@@ -36,9 +36,9 @@ export function Page({ title, description, actions, children }: { title: string;
 
 export function Card({ title, description, actions, children, className }: { title?: string; description?: string; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-xl border border-border bg-card text-card-foreground shadow-xs", className)}>
+    <section className={cn("rounded-xl border-2 border-foreground/25 bg-card text-card-foreground shadow-xs", className)}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3 sm:px-5">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-foreground/25 px-4 py-2.5">
           <div className="min-w-0">
             {title && <h2 className="m-0 text-base font-semibold">{title}</h2>}
             {description && <p className="m-0 mt-0.5 text-xs text-muted-foreground">{description}</p>}
@@ -46,7 +46,7 @@ export function Card({ title, description, actions, children, className }: { tit
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className="p-4 sm:p-5">{children}</div>
+      <div className="p-4">{children}</div>
     </section>
   );
 }
@@ -302,9 +302,16 @@ export function FilePicker({ label, accept, disabled, onFile }: { label: string;
   );
 }
 
-export function ProgressBar({ value, max }: { value: number; max: number }) {
+// Thanh tiến độ chỉ có hai màu: xanh lá = đã hoàn thành/đạt, đỏ = chưa hoàn thành (đang làm, chờ, trượt, quá hạn...).
+const DONE_STATUS = new Set(["completed", "in_progress", "accepted", "approved", "lecturer_passed", "confirmed"]);
+
+export function outcomeBg(status: string): string {
+  return DONE_STATUS.has(status) ? "bg-green-600" : "bg-red-600";
+}
+
+export function ProgressBar({ value, max, status }: { value: number; max: number; status?: string }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  return <Progress value={pct} className="h-2" />;
+  return <Progress value={pct} className="h-2.5 border border-foreground/25" indicatorClassName={status ? outcomeBg(status) : undefined} />;
 }
 
 export function DownloadLink({ href, children }: { href: string; children: ReactNode }) {
@@ -385,9 +392,9 @@ export function StatCard({
       )}
     </div>
   );
-  const cls = "block rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xs";
+  const cls = "block rounded-xl border-2 border-foreground/25 bg-card p-4 text-card-foreground shadow-xs";
   return href ? (
-    <Link href={href} className={cn(cls, "transition-colors hover:border-primary/40 hover:bg-accent/40")}>
+    <Link href={href} className={cn(cls, "transition-colors hover:bg-accent/60")}>
       {body}
     </Link>
   ) : (

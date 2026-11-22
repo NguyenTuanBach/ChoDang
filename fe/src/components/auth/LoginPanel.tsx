@@ -95,7 +95,7 @@ export default function LoginPanel({ fetchImpl }: { fetchImpl?: typeof fetch }) 
           <p className="mt-2 text-sm text-muted-foreground">Hệ thống hỗ trợ thực tập</p>
         </div>
 
-        <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs">
+        <section className="mb-4 rounded-xl border-2 border-foreground/25 bg-card p-5 shadow-xs">
           <h2 className="mb-1 mt-0 text-base font-semibold">Đăng nhập bằng Google</h2>
           <p className="mb-3 mt-0 text-sm text-muted-foreground">
             Dành cho tài khoản đã được mời qua email.{google ? "" : " Chưa cấu hình GOOGLE_CLIENT_ID/SECRET ở BE."}
@@ -113,7 +113,7 @@ export default function LoginPanel({ fetchImpl }: { fetchImpl?: typeof fetch }) 
         {accounts === undefined && <p className="text-center text-sm text-muted-foreground">Đang tải...</p>}
 
         {accounts && (
-          <section className="mb-4 rounded-xl border border-border bg-card p-5 shadow-xs" aria-labelledby="dev-login-title">
+          <section className="mb-4 rounded-xl border-2 border-foreground/25 bg-card p-5 shadow-xs" aria-labelledby="dev-login-title">
             <h2 id="dev-login-title" className="mb-1 mt-0 text-base font-semibold">
               Đăng nhập dev
             </h2>
@@ -130,7 +130,7 @@ export default function LoginPanel({ fetchImpl }: { fetchImpl?: typeof fetch }) 
                       <button
                         key={account.email}
                         type="button"
-                        className="flex flex-col items-start rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex flex-col items-start rounded-lg border-2 border-foreground/25 bg-background px-3 py-2 text-left transition-colors hover:border-primary hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={busy !== null}
                         onClick={() => void signIn(account.email)}
                       >

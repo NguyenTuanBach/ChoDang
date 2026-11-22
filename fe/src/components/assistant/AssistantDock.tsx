@@ -28,7 +28,7 @@ function Dock({ pathname }: { pathname: string }) {
           className={cn("sticky top-0 h-svh shrink-0 overflow-hidden transition-[width] duration-200 ease-linear", open ? "w-[26rem]" : "w-0")}
         >
           <div className="h-full w-[26rem] py-2 pr-2">
-            <div className="h-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="h-full overflow-hidden rounded-xl border-2 border-foreground/25 bg-card shadow-sm">
               <AssistantPanel onClose={() => setOpen(false)} />
             </div>
           </div>

@@ -52,7 +52,7 @@ function AskAssistant() {
             type="button"
             disabled={busy}
             onClick={() => askInDock(q)}
-            className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-sm transition-colors hover:border-primary/50 hover:bg-accent disabled:opacity-50"
+            className="flex items-center justify-between gap-2 rounded-lg border-2 border-foreground/25 bg-background px-3 py-2 text-left text-sm transition-colors hover:border-primary/50 hover:bg-accent disabled:opacity-50"
           >
             <span>{q}</span>
             <Sparkles className="size-4 shrink-0 text-primary" aria-hidden="true" />
@@ -129,7 +129,7 @@ export default function StudentHome() {
                       </p>
                     )}
                     {step && (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-accent/60 px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-foreground/25 bg-accent/60 px-4 py-3">
                         <span className="flex items-center gap-2 text-sm font-medium">
                           <ClipboardCheck className="size-4 text-primary" aria-hidden="true" />
                           {step.text}
@@ -142,7 +142,7 @@ export default function StudentHome() {
                     {todo.length > 0 && (
                       <ul className="m-0 mt-3 list-none space-y-2 p-0">
                         {todo.map((m) => (
-                          <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm">
+                          <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border-2 border-foreground/25 bg-background px-4 py-2.5 text-sm">
                             <span className="flex items-center gap-2">
                               <StatusBadge kind="milestone" value={m.status} /> <span>{m.next_action}</span>
                             </span>

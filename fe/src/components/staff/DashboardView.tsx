@@ -28,7 +28,7 @@ function Bars({ rows, labels }: { rows: { key: string; n: number }[]; labels: Re
             <span>{labels[r.key] ?? r.key}</span>
             <strong>{r.n}</strong>
           </Row>
-          <ProgressBar value={r.n} max={max} />
+          <ProgressBar value={r.n} max={max} status={r.key} />
         </div>
       ))}
     </>
