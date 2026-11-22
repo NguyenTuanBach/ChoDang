@@ -66,7 +66,7 @@ export default function InternshipList({ base, fixedStatus, title }: { base: "/l
             rows.length === 0 ? (
               <Empty>Không có hồ sơ phù hợp.</Empty>
             ) : (
-              <Table head={["Sinh viên", "Doanh nghiệp", "GV", "Trạng thái", "Thời gian", "Quá hạn", "Chờ duyệt", ""]}>
+              <Table head={["Sinh viên", "Doanh nghiệp", "GV", "Trạng thái", "Bắt đầu", "Kết thúc", "Quá hạn", "Chờ duyệt", ""]}>
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>
@@ -79,10 +79,8 @@ export default function InternshipList({ base, fixedStatus, title }: { base: "/l
                     <td className="whitespace-nowrap">
                       <StatusBadge kind="internship" value={r.status} />
                     </td>
-                    <td className="whitespace-nowrap">
-                      {fmtDate(r.start_date)}
-                      <br />→ {fmtDate(r.end_date)}
-                    </td>
+                    <td className="whitespace-nowrap">{fmtDate(r.start_date)}</td>
+                    <td className="whitespace-nowrap">{fmtDate(r.end_date)}</td>
                     <td className="whitespace-nowrap text-center">{r.overdue_milestones > 0 ? <Badge tone="bad">{r.overdue_milestones}</Badge> : 0}</td>
                     <td className="whitespace-nowrap text-center">{r.submitted_milestones}</td>
                     <td className="whitespace-nowrap">

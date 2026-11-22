@@ -12,6 +12,9 @@ Trang `/` trước đây chỉ chuyển hướng theo vai trò; người chưa �
 - Thanh tiến độ (`ProgressBar`, thanh phân bố ở `QueuePanel`): xanh lá = hoàn thành, đỏ = chưa hoàn thành, danh sách `DONE_STATUS` trong `ui.tsx`.
 
 - Các trang quản trị/giảng viên: card trắng viền đen nhạt; popup Thêm/Sửa (`ui/dialog.tsx`, `ui/search-select.tsx`) cho LMS và Cấu hình; menu ba chấm cho cờ rủi ro; bộ lọc hàng chờ; biểu đồ tròn/cột (`ui/charts.tsx`) và card Rủi ro ở `/dashboard`; chi tiết hồ sơ gộp thông tin vào card đầu, minh chứng gần nhất kèm cột "Cập nhật".
+- Landing: bỏ biểu tượng trên card, dải bốn mục, ảnh giao diện Trợ lý (`fe/public/landing/assistant.png`), card bốn bước viền be + số be (token `beige`, `beige-strong`).
+- Tách cột ngày bắt đầu/kết thúc (danh sách hồ sơ, hiệu lực quy định), bỏ cột Neo ở Mốc mẫu.
+- `/student/milestones`: dòng thời gian dọc (mốc xong xanh, mốc tiếp theo nổi bật, quá hạn viền đỏ). Chưa có "minh chứng yêu cầu"/"căn cứ điều khoản" vì BE chưa trả.
 
 ## Kiểm tra
 - `tsc --noEmit` và `eslint` sạch; `GET /` trả 200. Xem bằng mắt qua ảnh chụp do người dùng gửi.

@@ -63,12 +63,11 @@ function Templates() {
     >
       <Async state={state}>
         {(list) => (
-          <Table head={["Mốc", "Tên", "Neo", "Lệch (ngày)"]}>
+          <Table head={["Mốc", "Tên", "Lệch (ngày)"]}>
             {list.map((t) => (
               <tr key={t.code}>
                 <td>{t.code}</td>
                 <td>{t.name}</td>
-                <td>{ANCHOR_LABEL[t.anchor] ?? t.anchor}</td>
                 <td>{t.offset_days}</td>
               </tr>
             ))}

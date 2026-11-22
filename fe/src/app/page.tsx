@@ -1,5 +1,5 @@
-import { Bot, CheckCircle2, ClipboardList, FileCheck2, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import LandingCta from "@/components/shared/LandingCta";
 
@@ -16,26 +16,23 @@ const STEPS = [
   { title: "Thẩm định và công nhận", text: "Giảng viên thẩm định, quản trị viên phê duyệt tín chỉ và đồng bộ sang hệ thống đào tạo." },
 ];
 
-const FEATURES: { eyebrow: string; title: string; text: string; icon: LucideIcon; rows: string[] }[] = [
+const FEATURES: { eyebrow: string; title: string; text: string; rows?: string[]; image?: { src: string; alt: string; width: number; height: number } }[] = [
   {
     eyebrow: "Trợ lý chính sách",
     title: "Hỏi quy chế, nhận câu trả lời có điều khoản.",
     text: "Trợ lý trả lời theo văn bản quy định hiện hành và luôn trích dẫn nguồn. Câu hỏi về hồ sơ của riêng bạn cũng được trả lời từ dữ liệu thật.",
-    icon: Bot,
-    rows: ["Em được gia hạn thực tập tối đa bao lâu?", "Theo Điều 12, khoản 3: tối đa 4 tuần, cần giảng viên phê duyệt.", "Mở trang Gia hạn →"],
+    image: { src: "/landing/assistant.png", alt: "Giao diện Trợ lý thực tập", width: 1607, height: 864 },
   },
   {
     eyebrow: "Theo dõi tiến độ",
     title: "Mọi mốc và minh chứng, một nơi.",
     text: "Thanh hành trình cho biết bạn đang ở bước nào, việc gì cần làm tiếp và hạn nộp. Giảng viên thấy cảnh báo sớm khi sinh viên chậm tiến độ.",
-    icon: ClipboardList,
-    rows: ["Hồ sơ · Đã xác nhận", "Đề cương · Đã phê duyệt", "Mốc 2 · Đang báo cáo", "Thẩm định · Chưa bắt đầu"],
+    image: { src: "/landing/progress.png", alt: "Trang Mốc và minh chứng của sinh viên với các mốc đã chấp nhận, mốc hiện tại và mốc chờ nộp", width: 1900, height: 863 },
   },
   {
     eyebrow: "Phê duyệt",
     title: "Hàng chờ gọn cho giảng viên và quản trị viên.",
     text: "Đề cương, ngoại lệ và quy đổi tín chỉ đi qua hàng chờ phê duyệt, kèm gợi ý tiền thẩm của AI để người duyệt xem nhanh hơn.",
-    icon: FileCheck2,
     rows: ["Đề cương · chờ duyệt", "Gia hạn 2 tuần · chờ duyệt", "Quy đổi 6 tín chỉ · chờ duyệt"],
   },
 ];
@@ -80,17 +77,12 @@ export default function Home() {
 
       <main id="main">
         <section className="mx-auto max-w-6xl px-6 pb-12 pt-16 text-center sm:pt-24">
-          <p className="text-sm font-medium text-primary">Dành cho sinh viên, giảng viên và quản trị viên thực tập.</p>
-          <h1 className="mx-auto mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl">
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl">
             Người đồng hành cho kỳ thực tập của bạn.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
             Trợ lý AI giải đáp quy chế, nhắc tiến độ và một nơi duy nhất để quản lý hồ sơ, đề cương, mốc báo cáo đến công nhận tín chỉ.
           </p>
-          <ul className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="size-4 text-primary" aria-hidden />Trả lời có trích dẫn</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="size-4 text-primary" aria-hidden />Nhắc việc theo mốc</li>
-          </ul>
           <div className="mx-auto mt-14 max-w-4xl rounded-2xl border-2 border-foreground/25 bg-card p-3 shadow-sm">
             <div className="flex items-center gap-1.5 px-2 pb-3">
               <span className="size-2.5 rounded-full bg-muted-foreground/30" />
@@ -112,21 +104,25 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">Hồ sơ, đề cương, mốc báo cáo, thẩm định: một luồng liên tục.</p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {TAGS.map((t) => (
-              <span key={t} className="rounded-full border px-3 py-1 text-xs text-muted-foreground">{t}</span>
-            ))}
-          </div>
         </section>
+
+        <div className="border-y-2 border-foreground/15 bg-background">
+          <ul className="mx-auto m-0 grid max-w-6xl list-none grid-cols-2 p-0 md:grid-cols-4 md:divide-x md:divide-foreground/15">
+            {TAGS.map((t) => (
+              <li key={t} className="px-4 py-5 text-center text-sm font-medium">
+                {t}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <section id="how" className="mx-auto max-w-6xl scroll-mt-16 px-6 py-16">
           <p className="text-sm font-medium text-primary">Từ đăng ký đến tín chỉ</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight">Một kỳ thực tập, bốn bước rõ ràng.</h2>
           <ol className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((s, i) => (
-              <li key={s.title} className="rounded-xl border-2 border-foreground/25 bg-card p-5">
-                <span className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">{i + 1}</span>
+              <li key={s.title} className="rounded-xl border-2 border-beige-strong bg-background p-5">
+                <span className="flex size-8 items-center justify-center rounded-full border-2 border-beige-strong bg-beige text-sm font-semibold text-foreground">{i + 1}</span>
                 <h3 className="mt-3 font-semibold">{s.title}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{s.text}</p>
               </li>
@@ -134,26 +130,31 @@ export default function Home() {
           </ol>
         </section>
 
-        {FEATURES.map(({ eyebrow, title, text, icon: Icon, rows }, i) => (
+        {FEATURES.map(({ eyebrow, title, text, rows, image }, i) => (
           <section key={eyebrow} className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-14 md:grid-cols-2">
             <div className={i % 2 === 1 ? "md:order-2" : ""}>
               <p className="text-sm font-medium text-primary">{eyebrow}</p>
               <h2 className="mt-2 text-3xl font-bold tracking-tight">{title}</h2>
               <p className="mt-4 text-muted-foreground">{text}</p>
             </div>
-            <div className="rounded-2xl border-2 border-foreground/25 bg-card p-4 shadow-sm">
-              <Icon className="mb-3 size-6 text-primary" aria-hidden />
-              <div className="space-y-2">
-                {rows.map((r) => (
-                  <div key={r} className="rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm">{r}</div>
-                ))}
+            {image ? (
+              <div className="overflow-hidden rounded-2xl border-2 border-foreground/25 shadow-sm">
+                <Image src={image.src} alt={image.alt} width={image.width} height={image.height} className="h-auto w-full" />
               </div>
-            </div>
+            ) : (
+              <div className="rounded-2xl border-2 border-foreground/25 bg-card p-4 shadow-sm">
+                <div className="space-y-2">
+                  {(rows ?? []).map((r) => (
+                    <div key={r} className="rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm">{r}</div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         ))}
 
         <section className="mx-auto max-w-6xl px-6 py-16">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-primary"><ShieldCheck className="size-4" aria-hidden />Bạn vẫn kiểm soát</p>
+          <p className="text-sm font-medium text-primary">Bạn vẫn kiểm soát</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight">Tự động hóa có ranh giới phê duyệt rõ ràng.</h2>
           <ul className="mt-8 grid gap-4 md:grid-cols-3">
             {CONTROL.map((c) => (

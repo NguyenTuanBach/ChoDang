@@ -47,7 +47,7 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
           </span>
         </Row>
         <p className="mb-0 mt-1">
-          {row.company_name || "Chưa khai báo doanh nghiệp"} · {fmtDate(row.start_date)} → {fmtDate(row.end_date)} · {MODE_LABEL[row.mode]}
+          {row.company_name || "Chưa khai báo doanh nghiệp"} · Bắt đầu {fmtDate(row.start_date)} · Kết thúc {fmtDate(row.end_date)} · {MODE_LABEL[row.mode]}
         </p>
         {row.decision_reason && <p className="mb-0 mt-1">Lý do quyết định gần nhất: {row.decision_reason}</p>}
         <div className="mt-3 border-t border-foreground/15 pt-3">
@@ -122,7 +122,7 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
             <div key={r.id} style={{ marginBottom: "0.75rem" }}>
               <Row>
                 <StatusBadge kind="request" value={r.status} />
-                <strong>{r.kind === "milestone_extension" ? `Gia hạn ${r.milestone_code} → ${fmtDate(r.new_due_date)}` : r.exception_type_name}</strong>
+                <strong>{r.kind === "milestone_extension" ? `Gia hạn ${r.milestone_code} (hạn mới ${fmtDate(r.new_due_date)})` : r.exception_type_name}</strong>
                 {r.affects_credit && <Badge tone="warn">Ảnh hưởng tín chỉ</Badge>}
               </Row>
               <p>Lý do: {r.reason}</p>

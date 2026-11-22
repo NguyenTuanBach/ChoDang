@@ -120,7 +120,7 @@ export default function StudentHome() {
                     <p className="mb-3 mt-0 flex flex-wrap items-center gap-2 text-sm">
                       <StatusBadge kind="internship" value={row.status} />
                       <span className="text-muted-foreground">
-                        Khóa {row.cohort} · Giảng viên: {row.lecturer_name ?? "chưa phân công"} · {fmtDate(row.start_date)} → {fmtDate(row.end_date)} · {row.company_name || "chưa khai báo doanh nghiệp"}
+                        Khóa {row.cohort} · Giảng viên: {row.lecturer_name ?? "chưa phân công"} · Bắt đầu {fmtDate(row.start_date)} · Kết thúc {fmtDate(row.end_date)} · {row.company_name || "chưa khai báo doanh nghiệp"}
                       </span>
                     </p>
                     {row.decision_reason && (

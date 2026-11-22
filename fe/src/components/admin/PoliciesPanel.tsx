@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { send } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
+import { fmtDate } from "@/lib/labels";
 import type { PolicyIngestResult, PolicyPreview, PolicyVersion } from "@/lib/types";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, OkText, Page, Row, Table, type Tone } from "@/components/ui/ui";
 
@@ -24,7 +25,7 @@ export default function PoliciesPanel() {
             list.length === 0 ? (
               <Empty>Chưa có văn bản nào.</Empty>
             ) : (
-              <Table head={["Mã", "Tên", "Phiên bản", "Hiệu lực", "Đoạn", "Trạng thái", ""]}>
+              <Table head={["Mã", "Tên", "Phiên bản", "Hiệu lực từ", "Hiệu lực đến", "Đoạn", "Trạng thái", ""]}>
                 {list.map((v) => (
                   <VersionRow key={v.id} version={v} reload={state.reload} onPreview={() => setPreviewId(v.id)} />
                 ))}
@@ -54,9 +55,8 @@ function VersionRow({ version: v, reload, onPreview }: { version: PolicyVersion;
         {v.doc_title} {v.is_sample && <Badge tone="warn">Bản mẫu</Badge>}
       </td>
       <td>{v.version_label}</td>
-      <td>
-        {v.effective_from} → {v.effective_to ?? "nay"}
-      </td>
+      <td className="whitespace-nowrap">{fmtDate(v.effective_from)}</td>
+      <td className="whitespace-nowrap">{v.effective_to ? fmtDate(v.effective_to) : "—"}</td>
       <td>{v.chunk_count}</td>
       <td>
         <Badge tone={s.tone}>{s.label}</Badge>
