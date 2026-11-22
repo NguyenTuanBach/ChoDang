@@ -18,7 +18,7 @@ export default function PoliciesPanel() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   return (
     <Page title="Văn bản quy định">
-      <Card title="Các phiên bản">
+      <Card title="Các phiên bản" className="bg-background">
         <Async state={state}>
           {(list) =>
             list.length === 0 ? (
@@ -87,7 +87,7 @@ function VersionRow({ version: v, reload, onPreview }: { version: PolicyVersion;
 function Preview({ id, onClose }: { id: string; onClose: () => void }) {
   const state = useApi<PolicyPreview>(`/api/admin/policies/versions/${id}`);
   return (
-    <Card title="Xem trước các đoạn đã tách">
+    <Card title="Xem trước các đoạn đã tách" className="bg-background">
       <Async state={state}>
         {({ version, chunks }) => (
           <>
@@ -150,10 +150,7 @@ function IngestForm({ onIngested }: { onIngested: (versionId: string) => void })
   }
 
   return (
-    <Card title="Nạp văn bản mới">
-      <p>
-        <small>Văn bản theo cấu trúc “Điều N.” / “Khoản M.”. Nạp xong là bản nháp — chưa ảnh hưởng Trợ lý cho tới khi xuất bản.</small>
-      </p>
+    <Card title="Nạp văn bản mới" className="bg-background">
       <Row>
         <Field label="Mã văn bản">
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="QD-TT-01" />

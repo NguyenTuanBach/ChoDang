@@ -61,9 +61,6 @@ function Content({ detail, reload }: { detail: InternshipDetail; reload: () => v
               </tr>
             ))}
           </Table>
-          <p>
-            <small>Hệ thống chỉ hiển thị đạt/chưa đạt từng điều kiện. Việc công nhận do giảng viên thẩm định và quản trị viên phê duyệt.</small>
-          </p>
         </Card>
       )}
     </>

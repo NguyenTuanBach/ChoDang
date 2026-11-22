@@ -1,14 +1,12 @@
 "use client";
 
-import { AlarmClock, Download, FolderOpen, Flag } from "lucide-react";
+import { AlarmClock, FolderOpen, Flag } from "lucide-react";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, MILESTONE_STATUS } from "@/lib/labels";
 import type { Dashboard } from "@/lib/types";
-import { Async, Card, Cols, Empty, Page, ProgressBar, Row, StatCard, Table } from "@/components/ui/ui";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { BarChart, BarLabels, CATEGORY_COLORS, PieChart } from "@/components/ui/charts";
+import { Async, Card, Cols, DownloadButton, Empty, Page, ProgressBar, Row, StatCard, isDoneStatus } from "@/components/ui/ui";
 
-const KIND_LABEL: Record<string, string> = { internship: "Hồ sơ", outline: "Đề cương", milestone: "Mốc", request: "Yêu cầu" };
 const CREDIT_LABEL: Record<string, string> = {
   pending: "Đang thẩm định",
   lecturer_passed: "GV thẩm định đạt, chờ QTV",
@@ -16,6 +14,24 @@ const CREDIT_LABEL: Record<string, string> = {
   approved: "Được công nhận",
   denied: "Không công nhận",
 };
+
+// Rủi ro: cờ mới (chưa ghi nhận), cờ đang mở/đã ghi nhận theo mức độ, và hồ sơ trễ hạn.
+function riskBars(d: Dashboard) {
+  const active = d.flags.filter((f) => f.status === "open" || f.status === "acknowledged");
+  const bySeverity = (sev: string) => active.filter((f) => f.severity === sev).reduce((n, f) => n + f.n, 0);
+  return [
+    { label: "Mới", value: d.flags.filter((f) => f.status === "open").reduce((n, f) => n + f.n, 0), color: "#2563eb" },
+    { label: "Thông tin", value: bySeverity("info"), color: "#737373" },
+    { label: "Cảnh báo", value: bySeverity("warning"), color: "#f59e0b" },
+    { label: "Nghiêm trọng", value: bySeverity("critical"), color: "#dc2626" },
+    { label: "Quá hạn", value: d.late_internships, color: "#ea580c" },
+  ];
+}
+
+// Cột mốc: xanh lá = đã chấp nhận, đỏ = chưa hoàn thành / quá hạn / bị trả lại.
+function milestoneBars(rows: { status: string; n: number }[]) {
+  return rows.map((r) => ({ label: MILESTONE_STATUS[r.status] ?? r.status, value: r.n, color: isDoneStatus(r.status) ? "#16a34a" : "#dc2626" }));
+}
 
 function Bars({ rows, labels }: { rows: { key: string; n: number }[]; labels: Record<string, string> }) {
   const max = Math.max(1, ...rows.map((r) => r.n));
@@ -43,10 +59,7 @@ export default function DashboardView() {
       title="Dashboard"
       description="Tiến độ, trễ hạn, rủi ro và công nhận tín chỉ."
       actions={
-        <a href="/api/dashboard/export.csv" className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-9 px-3.5 shadow-xs")}>
-          <Download className="size-4" aria-hidden="true" />
-          Xuất báo cáo (CSV)
-        </a>
+        <DownloadButton href="/api/dashboard/export.csv">Xuất báo cáo (CSV)</DownloadButton>
       }
     >
       <Async state={state}>
@@ -76,23 +89,17 @@ export default function DashboardView() {
               </div>
               <Cols>
                 <Card title="Hồ sơ theo trạng thái">
-                  <Bars rows={d.internships_by_status.map((r) => ({ key: r.status, n: r.n }))} labels={INTERNSHIP_STATUS} />
+                  <PieChart data={d.internships_by_status.map((r, i) => ({ label: INTERNSHIP_STATUS[r.status] ?? r.status, value: r.n, color: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }))} />
                 </Card>
                 <Card title="Mốc theo trạng thái">
-                  <Bars rows={d.milestones_by_status.map((r) => ({ key: r.status, n: r.n }))} labels={MILESTONE_STATUS} />
+                  <BarChart data={milestoneBars(d.milestones_by_status)} />
+                  <BarLabels data={milestoneBars(d.milestones_by_status)} />
                 </Card>
               </Cols>
               <Cols>
-                <Card title="Thời gian ra quyết định (trung vị)">
-                  <Table head={["Loại", "Số quyết định", "Trung vị (ngày)"]}>
-                    {d.decision_times.map((t) => (
-                      <tr key={t.kind}>
-                        <td>{KIND_LABEL[t.kind] ?? t.kind}</td>
-                        <td>{t.count}</td>
-                        <td>{t.median_days === null ? "—" : t.median_days.toFixed(1)}</td>
-                      </tr>
-                    ))}
-                  </Table>
+                <Card title="Rủi ro">
+                  <BarChart data={riskBars(d)} />
+                  <BarLabels data={riskBars(d)} />
                 </Card>
                 <Card title="Kết quả công nhận tín chỉ">
                   <Bars rows={d.credit_outcomes.map((r) => ({ key: r.status, n: r.n }))} labels={CREDIT_LABEL} />

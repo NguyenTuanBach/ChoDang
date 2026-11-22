@@ -2,7 +2,8 @@
 
 import { AlarmClock, Flag, Hourglass, Inbox, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
-import { Async, Badge, Card, EmptyState, Page, StatCard, StatusBadge, outcomeBg } from "@/components/ui/ui";
+import { useState } from "react";
+import { Async, Badge, Button, Card, EmptyState, Page, StatCard, StatusBadge, outcomeBg } from "@/components/ui/ui";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, QUEUE_KIND, fmtDate, fmtDateTime } from "@/lib/labels";
 import type { Dashboard, QueueItem } from "@/lib/types";
@@ -18,6 +19,24 @@ function linkOf(i: QueueItem, base: "/lecturer" | "/admin") {
 // Hoàn thành = xanh lá, chưa hoàn thành = đỏ.
 const segmentClass = (status: string) => outcomeBg(status);
 
+// Bộ lọc hàng chờ (làm ở trình duyệt): theo mức gấp, rủi ro, quá hạn hoặc loại việc.
+const startOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+const FILTERS: { key: string; label: string; match: (i: QueueItem) => boolean }[] = [
+  { key: "all", label: "Tất cả", match: () => true },
+  { key: "urgent", label: "Gấp", match: (i) => i.priority >= 60 },
+  { key: "risk", label: "Rủi ro", match: (i) => i.kind === "risk_flag" },
+  { key: "overdue", label: "Quá hạn", match: (i) => !!i.due_date && new Date(i.due_date).getTime() < startOfToday() },
+  { key: "internship", label: "Hồ sơ", match: (i) => i.kind === "internship_submitted" },
+  { key: "outline", label: "Đề cương", match: (i) => i.kind === "outline_submitted" },
+  { key: "milestone", label: "Mốc", match: (i) => i.kind === "milestone_submitted" },
+  { key: "request", label: "Yêu cầu", match: (i) => i.kind === "request" },
+  { key: "credit", label: "Tín chỉ", match: (i) => i.kind === "credit_assessment" || i.kind === "credit_approval" },
+];
+
 // Thanh xếp chồng phân bố hồ sơ theo trạng thái + chú giải (màu lấy từ bảng chart của chủ đề).
 function StatusDistribution({ rows }: { rows: { status: string; n: number }[] }) {
   const total = rows.reduce((s, r) => s + r.n, 0);
@@ -29,7 +48,7 @@ function StatusDistribution({ rows }: { rows: { status: string; n: number }[] })
           <span key={r.status} className={segmentClass(r.status)} style={{ width: `${(r.n / total) * 100}%` }} title={`${INTERNSHIP_STATUS[r.status] ?? r.status}: ${r.n}`} />
         ))}
       </div>
-      <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-x-4 gap-y-1.5 p-0 text-sm sm:grid-cols-2">
+      <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-y-2 p-0 text-sm">
         {rows.map((r) => (
           <li key={r.status} className="flex items-center gap-2">
             <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", segmentClass(r.status))} />
@@ -49,6 +68,7 @@ export default function QueuePanel({ base }: { base: "/lecturer" | "/admin" }) {
   const queue = useApi<QueueItem[]>("/api/queue");
   const dash = useApi<Dashboard>("/api/dashboard");
   const isAdmin = base === "/admin";
+  const [filter, setFilter] = useState("all");
   const firstName = user.full_name.replace(/\(.*?\)/g, "").trim() || user.email;
 
   const d = dash.data;
@@ -76,9 +96,13 @@ export default function QueuePanel({ base }: { base: "/lecturer" | "/admin" }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card title="Hàng chờ duyệt" description="Xếp theo mức ưu tiên">
+      <Card title="Hồ sơ theo trạng thái">
+        <Async state={dash}>{(data) => <StatusDistribution rows={data.internships_by_status} />}</Async>
+      </Card>
+
+      <div>
+        <div>
+          <Card title="Hàng chờ duyệt">
             <Async state={queue}>
               {(items) =>
                 items.length === 0 ? (
@@ -86,8 +110,21 @@ export default function QueuePanel({ base }: { base: "/lecturer" | "/admin" }) {
                     Hồ sơ, đề cương, mốc và yêu cầu mới sẽ hiện ở đây.
                   </EmptyState>
                 ) : (
-                  <ul className="m-0 list-none space-y-2 p-0">
-                    {items.map((i) => {
+                  <>
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {FILTERS.map((f) => {
+                      const n = items.filter(f.match).length;
+                      if (f.key !== "all" && n === 0 && filter !== f.key) return null;
+                      return (
+                        <Button key={f.key} variant={filter === f.key ? "primary" : "default"} onClick={() => setFilter(f.key)}>
+                          {f.label} ({n})
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  {items.filter((FILTERS.find((f) => f.key === filter) ?? FILTERS[0]).match).length === 0 && <EmptyState icon={Inbox} title="Không có việc nào thuộc bộ lọc này" />}
+                  <ul className="m-0 list-none space-y-3 p-0">
+                    {items.filter((FILTERS.find((f) => f.key === filter) ?? FILTERS[0]).match).map((i) => {
                       const urgent = i.priority >= 60;
                       const soon = i.priority >= 35;
                       return (
@@ -95,7 +132,7 @@ export default function QueuePanel({ base }: { base: "/lecturer" | "/admin" }) {
                           <Link
                             href={linkOf(i, base)}
                             className={cn(
-                              "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border-2 border-foreground/25 bg-background px-3 py-2.5 text-foreground no-underline transition-colors hover:bg-muted",
+                              "flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border-2 border-foreground/25 bg-background px-5 py-4 text-foreground no-underline transition-colors hover:bg-muted",
                               urgent ? "border-l-[6px] border-l-destructive" : soon ? "border-l-[6px] border-l-orange-500" : "",
                             )}
                           >
@@ -107,25 +144,22 @@ export default function QueuePanel({ base }: { base: "/lecturer" | "/admin" }) {
                               </span>
                             </span>
                             <span className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-                              <Badge tone={urgent ? "bad" : soon ? "action" : "neutral"}>Ưu tiên {i.priority}</Badge>
+                              {urgent ? <Badge tone="bad">Gấp</Badge> : soon ? <Badge tone="action">Nên xử lý sớm</Badge> : null}
                               <span>Chờ từ {fmtDateTime(i.since)}</span>
                               {i.due_date && <span>Hạn {fmtDate(i.due_date)}</span>}
                             </span>
-                            <span className="text-sm font-medium text-primary">Mở →</span>
+                            <span className="ml-2 inline-flex h-9 items-center rounded-lg border-2 border-foreground/25 bg-card px-4 text-sm font-medium">Mở</span>
                           </Link>
                         </li>
                       );
                     })}
                   </ul>
+                  </>
                 )
               }
             </Async>
           </Card>
         </div>
-
-        <Card title="Hồ sơ theo trạng thái">
-          <Async state={dash}>{(data) => <StatusDistribution rows={data.internships_by_status} />}</Async>
-        </Card>
       </div>
     </Page>
   );

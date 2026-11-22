@@ -1,11 +1,12 @@
 "use client";
 
+import { ArrowUpRight } from "lucide-react";
 import { useState } from "react";
 import { send } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { FLAG_KIND, MODE_LABEL, fmtDate, fmtDateTime } from "@/lib/labels";
 import type { InternshipDetail, Milestone, Outline, Suggestion } from "@/lib/types";
-import { Async, Badge, Button, Card, Cols, DecisionPanel, Empty, ErrorText, Field, Page, Pre, Row, StatusBadge, Table } from "@/components/ui/ui";
+import { Async, Badge, Button, Card, DecisionPanel, Empty, ErrorText, Field, Page, Pre, Row, StatusBadge, Table } from "@/components/ui/ui";
 import DownloadDoc from "@/components/student/DownloadDoc";
 import { FlagActions } from "./FlagsPanel";
 import { RequestDecision } from "./RequestsReview";
@@ -45,11 +46,34 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
             {row.student_code ?? row.student_email} · Khóa {row.cohort} · GV: {row.lecturer_name ?? "—"}
           </span>
         </Row>
-        <p>
+        <p className="mb-0 mt-1">
           {row.company_name || "Chưa khai báo doanh nghiệp"} · {fmtDate(row.start_date)} → {fmtDate(row.end_date)} · {MODE_LABEL[row.mode]}
         </p>
-        {row.decision_reason && <p>Lý do quyết định gần nhất: {row.decision_reason}</p>}
+        {row.decision_reason && <p className="mb-0 mt-1">Lý do quyết định gần nhất: {row.decision_reason}</p>}
+        <div className="mt-3 border-t border-foreground/15 pt-3">
+          <dl className="m-0 grid grid-cols-[8.5rem_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="font-medium text-muted-foreground">MST · Địa chỉ</dt>
+            <dd className="m-0">
+              {row.company_tax_code} · {row.company_address}
+            </dd>
+            <dt className="font-medium text-muted-foreground">Vị trí</dt>
+            <dd className="m-0">{row.position}</dd>
+            <dt className="font-medium text-muted-foreground">Người hướng dẫn</dt>
+            <dd className="m-0">
+              {row.mentor_name} · {row.mentor_email} · {row.mentor_phone}
+            </dd>
+            <dt className="font-medium text-muted-foreground">Mô tả công việc</dt>
+            <dd className="m-0 whitespace-pre-wrap break-words">{row.job_description}</dd>
+          </dl>
+          {Object.values(row.field_confirmations).includes("ai_confirmed") && <p className="mb-0 mt-3"><small>Các trường do AI gợi ý và sinh viên đã xác nhận: {Object.entries(row.field_confirmations).filter(([, v]) => v === "ai_confirmed").map(([k]) => k).join(", ")}</small></p>}
+          {d.documents.map((doc) => (
+            <div key={doc.id} className="mt-2">
+              <DownloadDoc href={`/api/documents/${doc.id}/download`} name={doc.filename} />
+            </div>
+          ))}
+        </div>
         {isLecturer && row.status === "submitted" && (
+          <div className="mt-3">
           <Row>
             <Button variant="primary" onClick={() => ask({ kind: "i", label: "Xác nhận hồ sơ", needReason: false, run: () => send("POST", `/api/internships/${row.id}/decision`, { action: "confirm" }) })}>
               Xác nhận hồ sơ
@@ -61,37 +85,12 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
               Từ chối
             </Button>
           </Row>
+          </div>
         )}
         {pending?.kind === "i" && <Decision pending={pending} action={action} onCancel={() => setPending(null)} />}
       </Card>
 
-      <Cols>
-        <Card title="Thông tin hồ sơ">
-          <p>
-            <strong>Doanh nghiệp:</strong> {row.company_name} (MST {row.company_tax_code})
-            <br />
-            {row.company_address}
-          </p>
-          <p>
-            <strong>Vị trí:</strong> {row.position}
-          </p>
-          <p>
-            <strong>Người hướng dẫn:</strong> {row.mentor_name} · {row.mentor_email} · {row.mentor_phone}
-          </p>
-          <p>
-            <strong>Mô tả công việc:</strong>
-          </p>
-          <Pre>{row.job_description}</Pre>
-          {Object.values(row.field_confirmations).includes("ai_confirmed") && <p><small>Các trường do AI gợi ý và sinh viên đã xác nhận: {Object.entries(row.field_confirmations).filter(([, v]) => v === "ai_confirmed").map(([k]) => k).join(", ")}</small></p>}
-          {d.documents.map((doc) => (
-            <div key={doc.id}>
-              <DownloadDoc href={`/api/documents/${doc.id}/download`} name={doc.filename} />
-            </div>
-          ))}
-        </Card>
-
-        {d.credit && <CreditCard d={d} role={role} reload={reload} />}
-      </Cols>
+      {d.credit && <CreditCard d={d} role={role} reload={reload} />}
 
       <Card title="Đề cương">
         {d.outlines.length === 0 && <Empty>Chưa nộp đề cương.</Empty>}
@@ -101,7 +100,7 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
       </Card>
 
       <Card title="Mốc">
-        <Table head={["Mốc", "Hạn", "Trạng thái", "Minh chứng", ""]}>
+        <Table head={["Mốc", "Hạn", "Trạng thái", "Minh chứng", "Cập nhật", ""]}>
           {d.milestones.map((m) => (
             <MilestoneRow key={m.id} m={m} d={d} isLecturer={isLecturer} reload={reload} />
           ))}
@@ -141,19 +140,23 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
 
       <Card title="Cờ rủi ro">
         {d.flags.length === 0 && <Empty>Không có cờ.</Empty>}
-        {d.flags.map((f) => (
-          <div key={f.id} style={{ marginBottom: "0.75rem" }}>
-            <Row>
-              <StatusBadge kind="severity" value={f.severity} />
-              <StatusBadge kind="flag" value={f.status} />
-              <strong>{FLAG_KIND[f.kind] ?? f.kind}</strong>
-              <Badge>{f.created_by_kind === "agent" ? "Do AI đề xuất" : "Do hệ thống phát hiện"}</Badge>
-            </Row>
-            <p>{f.reason}</p>
-            {f.suggestion && <p>Gợi ý: {f.suggestion}</p>}
-            <FlagActions flag={f} reload={reload} />
-          </div>
-        ))}
+        <div className="space-y-3">
+          {d.flags.map((f) => (
+            <div key={f.id} className="flex items-start justify-between gap-4 rounded-lg border-2 border-foreground/15 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <Row>
+                  <StatusBadge kind="severity" value={f.severity} />
+                  <StatusBadge kind="flag" value={f.status} />
+                  <strong>{FLAG_KIND[f.kind] ?? f.kind}</strong>
+                  <Badge>{f.created_by_kind === "agent" ? "Do AI đề xuất" : "Do hệ thống phát hiện"}</Badge>
+                </Row>
+                <p className="mb-0 mt-2 text-sm">{f.reason}</p>
+                {f.suggestion && <p className="mb-0 mt-1 text-sm text-muted-foreground">Gợi ý: {f.suggestion}</p>}
+              </div>
+              <FlagActions flag={f} reload={reload} />
+            </div>
+          ))}
+        </div>
       </Card>
     </>
   );
@@ -274,7 +277,9 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
     setPending(null);
     reload();
   });
-  const evidence = d.evidence.filter((e) => e.milestone_code === m.code);
+  // Chỉ hiện minh chứng gần nhất của mốc; thời điểm cập nhật = lúc duyệt nếu đã duyệt, không thì lúc nộp.
+  const updatedAt = (e: InternshipDetail["evidence"][number]) => e.reviewed_at ?? e.submitted_at;
+  const latest = d.evidence.filter((e) => e.milestone_code === m.code).sort((a, b) => updatedAt(b).localeCompare(updatedAt(a)))[0];
   const suggestions = d.suggestions.filter((s) => s.subject_kind === "milestone" && s.subject_id === m.id);
   const id = d.internship?.id ?? 0;
   return (
@@ -289,11 +294,20 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
           {m.note && <div>{m.note}</div>}
         </td>
         <td>
-          {evidence.length === 0 && "—"}
-          {evidence.map((e) => (
-            <div key={e.id}>{e.filename ? <DownloadDoc href={`/api/evidence/${e.id}/download`} name={e.title || e.filename} /> : e.title} <StatusBadge kind="milestone" value={e.status} /></div>
-          ))}
+          {latest ? (
+            latest.filename ? (
+              <a href={`/api/evidence/${latest.id}/download`} download title={latest.title || latest.filename} aria-label="Mở minh chứng" className="inline-flex items-center gap-1 no-underline">
+                <StatusBadge kind="milestone" value={latest.status} />
+                <ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" />
+              </a>
+            ) : (
+              <StatusBadge kind="milestone" value={latest.status} />
+            )
+          ) : (
+            "—"
+          )}
         </td>
+        <td className="whitespace-nowrap">{latest ? fmtDateTime(updatedAt(latest)) : "—"}</td>
         <td>
           {m.stored_status === "submitted" && (
             <Row>
@@ -314,7 +328,7 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
       </tr>
       {(pending || suggestions.length > 0) && (
         <tr>
-          <td colSpan={5}>
+          <td colSpan={6}>
             <Suggestions items={suggestions} />
             {pending && <Decision pending={pending} action={action} onCancel={() => setPending(null)} />}
           </td>

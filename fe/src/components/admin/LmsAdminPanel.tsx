@@ -4,6 +4,8 @@ import { useState } from "react";
 import { send, upload } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import type { Course, LmsStudent, SyncJob } from "@/lib/types";
+import FormDialog from "@/components/ui/dialog";
+import SearchSelect from "@/components/ui/search-select";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, OkText, Page, Row, Table } from "@/components/ui/ui";
 
 // Giao diện của LMS mini: học phần, tiên quyết, sinh viên, điểm, nhập CSV và theo dõi đồng bộ kết quả quy đổi tín chỉ (D5, D6).
@@ -22,7 +24,7 @@ function SyncJobs() {
   const state = useApi<SyncJob[]>("/api/admin/lms/sync-jobs");
   const retry = useAction(state.reload);
   return (
-    <Card title="Đồng bộ kết quả quy đổi sang LMS">
+    <Card title="Đồng bộ kết quả quy đổi sang LMS" className="bg-background">
       <Async state={state}>
         {(jobs) =>
           jobs.length === 0 ? (
@@ -55,12 +57,45 @@ function SyncJobs() {
 function Courses() {
   const state = useApi<Course[]>("/api/lms/courses");
   const [form, setForm] = useState({ code: "", name: "", credits: "3", kind: "regular" });
+  // "add": các trường trống để thêm mới; "edit": điền sẵn dữ liệu của dòng đang sửa (mã là khóa nên khóa lại).
+  const [mode, setMode] = useState<"add" | "edit" | null>(null);
   const save = useAction(() => {
-    setForm({ code: "", name: "", credits: "3", kind: "regular" });
+    setMode(null);
     state.reload();
   });
+  const openAdd = () => {
+    setForm({ code: "", name: "", credits: "3", kind: "regular" });
+    save.clearError();
+    setMode("add");
+  };
+  const pick = (code: string) => {
+    const c = state.data?.find((x) => x.code === code);
+    if (c) setForm({ code: c.code, name: c.name, credits: String(c.credits), kind: c.kind });
+  };
+  // Mở popup sửa với học phần đầu tiên chọn sẵn để các trường đã có dữ liệu; đổi học phần bằng ô chọn có tìm kiếm.
+  const openEdit = () => {
+    const first = state.data?.[0];
+    if (!first) return;
+    pick(first.code);
+    save.clearError();
+    setMode("edit");
+  };
+  const editing = mode === "edit";
   return (
-    <Card title="Học phần">
+    <Card
+      title="Học phần"
+      className="bg-background"
+      actions={
+        <>
+          <Button variant="primary" onClick={openEdit} disabled={!state.data?.length}>
+            Sửa
+          </Button>
+          <Button variant="primary" onClick={openAdd}>
+            Thêm
+          </Button>
+        </>
+      }
+    >
       <Async state={state}>
         {(list) => (
           <Table head={["Mã", "Tên", "Tín chỉ", "Loại"]}>
@@ -75,19 +110,34 @@ function Courses() {
           </Table>
         )}
       </Async>
-      <Row>
-        <input placeholder="Mã" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} size={8} />
-        <input placeholder="Tên học phần" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} size={30} />
-        <input type="number" min={1} value={form.credits} onChange={(e) => setForm({ ...form, credits: e.target.value })} style={{ width: "4rem" }} />
-        <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-          <option value="regular">Thường</option>
-          <option value="internship">Thực tập</option>
-        </select>
-        <Button variant="primary" disabled={save.busy || !form.code.trim() || !form.name.trim()} onClick={() => void save.run(() => send("PUT", "/api/admin/lms/courses", { ...form, credits: Number(form.credits) }))}>
-          Thêm / sửa
-        </Button>
-      </Row>
-      <ErrorText message={save.error} />
+      <FormDialog title={editing ? "Sửa học phần" : "Thêm học phần"} open={mode !== null} onOpenChange={(o) => !o && setMode(null)}>
+        <Field label="Mã học phần" required>
+          {editing ? (
+            <SearchSelect options={(state.data ?? []).map((c) => ({ value: c.code, label: c.code }))} value={form.code} onChange={pick} placeholder="Tìm học phần..." />
+          ) : (
+            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+          )}
+        </Field>
+        <Field label="Tên học phần" required>
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Số tín chỉ" required>
+          <input type="number" min={1} value={form.credits} onChange={(e) => setForm({ ...form, credits: e.target.value })} />
+        </Field>
+        <Field label="Loại">
+          <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+            <option value="regular">Thường</option>
+            <option value="internship">Thực tập</option>
+          </select>
+        </Field>
+        <ErrorText message={save.error} />
+        <Row>
+          <Button disabled={save.busy || !form.code.trim() || !form.name.trim()} onClick={() => void save.run(() => send("PUT", "/api/admin/lms/courses", { ...form, credits: Number(form.credits) }))}>
+            Lưu
+          </Button>
+          <Button onClick={() => setMode(null)}>Hủy</Button>
+        </Row>
+      </FormDialog>
       <Prerequisites courses={state.data ?? []} />
     </Card>
   );
@@ -98,7 +148,12 @@ function Prerequisites({ courses }: { courses: Course[] }) {
   const state = useApi<{ required_course_code: string; required_name: string; min_score: number }[]>(internship ? `/api/admin/lms/courses/${internship.code}/prerequisites` : null);
   const [required, setRequired] = useState("");
   const [min, setMin] = useState("5");
-  const add = useAction(state.reload);
+  const [open, setOpen] = useState(false);
+  const add = useAction(() => {
+    setRequired("");
+    setOpen(false);
+    state.reload();
+  });
   const remove = useAction(state.reload);
   if (!internship) return null;
   return (
@@ -128,20 +183,31 @@ function Prerequisites({ courses }: { courses: Course[] }) {
         }
       </Async>
       <Row>
-        <select value={required} onChange={(e) => setRequired(e.target.value)}>
-          <option value="">Chọn học phần</option>
-          {courses.filter((c) => c.code !== internship.code).map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.code} — {c.name}
-            </option>
-          ))}
-        </select>
-        <input type="number" step="0.5" min={0} max={10} value={min} onChange={(e) => setMin(e.target.value)} style={{ width: "4rem" }} />
-        <Button disabled={add.busy || !required} onClick={() => void add.run(() => send("PUT", `/api/admin/lms/courses/${internship.code}/prerequisites`, { required_course_code: required, min_score: Number(min) }))}>
-          Thêm tiên quyết
-        </Button>
+        <Button onClick={() => setOpen(true)}>Thêm tiên quyết</Button>
       </Row>
-      <ErrorText message={add.error ?? remove.error} />
+      <FormDialog title="Thêm học phần tiên quyết" open={open} onOpenChange={setOpen}>
+        <Field label="Học phần" required>
+          <select value={required} onChange={(e) => setRequired(e.target.value)}>
+            <option value="">Chọn học phần</option>
+            {courses.filter((c) => c.code !== internship.code).map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code} — {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Điểm tối thiểu">
+          <input type="number" step="0.5" min={0} max={10} value={min} onChange={(e) => setMin(e.target.value)} />
+        </Field>
+        <ErrorText message={add.error} />
+        <Row>
+          <Button disabled={add.busy || !required} onClick={() => void add.run(() => send("PUT", `/api/admin/lms/courses/${internship.code}/prerequisites`, { required_course_code: required, min_score: Number(min) }))}>
+            Lưu
+          </Button>
+          <Button onClick={() => setOpen(false)}>Hủy</Button>
+        </Row>
+      </FormDialog>
+      <ErrorText message={remove.error} />
     </>
   );
 }
@@ -150,16 +216,48 @@ function Students() {
   const state = useApi<LmsStudent[]>("/api/admin/lms/students");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [mode, setMode] = useState<"add" | "edit" | null>(null);
   const save = useAction(() => {
-    setCode("");
-    setName("");
+    setMode(null);
     state.reload();
   });
+  const openAdd = () => {
+    setCode("");
+    setName("");
+    save.clearError();
+    setMode("add");
+  };
+  const pick = (studentCode: string) => {
+    const s = state.data?.find((x) => x.student_code === studentCode);
+    if (s) {
+      setCode(s.student_code);
+      setName(s.full_name);
+    }
+  };
+  // Mở popup sửa với sinh viên đầu tiên chọn sẵn; đổi sinh viên bằng ô chọn có tìm kiếm (mã SV không gõ tự do).
+  const openEdit = () => {
+    const first = state.data?.[0];
+    if (!first) return;
+    pick(first.student_code);
+    save.clearError();
+    setMode("edit");
+  };
+  const editing = mode === "edit";
   return (
-    <Card title="Sinh viên trong LMS">
-      <p>
-        <small>Mã sinh viên ở đây phải trùng mã sinh viên đã đặt trong tài khoản để ghi kết quả quy đổi tín chỉ.</small>
-      </p>
+    <Card
+      title="Sinh viên trong LMS"
+      className="bg-background"
+      actions={
+        <>
+          <Button variant="primary" onClick={openEdit} disabled={!state.data?.length}>
+            Sửa
+          </Button>
+          <Button variant="primary" onClick={openAdd}>
+            Thêm
+          </Button>
+        </>
+      }
+    >
       <Async state={state}>
         {(list) => (
           <Table head={["Mã SV", "Họ tên", "Tín chỉ tích lũy từ thực tập"]}>
@@ -173,14 +271,25 @@ function Students() {
           </Table>
         )}
       </Async>
-      <Row>
-        <input placeholder="Mã SV" value={code} onChange={(e) => setCode(e.target.value)} size={10} />
-        <input placeholder="Họ tên" value={name} onChange={(e) => setName(e.target.value)} size={30} />
-        <Button variant="primary" disabled={save.busy || !code.trim()} onClick={() => void save.run(() => send("PUT", "/api/admin/lms/students", { student_code: code, full_name: name }))}>
-          Thêm / sửa
-        </Button>
-      </Row>
-      <ErrorText message={save.error} />
+      <FormDialog title={editing ? "Sửa sinh viên" : "Thêm sinh viên"} open={mode !== null} onOpenChange={(o) => !o && setMode(null)}>
+        <Field label="Mã sinh viên" required>
+          {editing ? (
+            <SearchSelect options={(state.data ?? []).map((s) => ({ value: s.student_code, label: s.student_code }))} value={code} onChange={pick} placeholder="Tìm sinh viên..." />
+          ) : (
+            <input value={code} onChange={(e) => setCode(e.target.value)} />
+          )}
+        </Field>
+        <Field label="Họ tên">
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <ErrorText message={save.error} />
+        <Row>
+          <Button disabled={save.busy || !code.trim()} onClick={() => void save.run(() => send("PUT", "/api/admin/lms/students", { student_code: code, full_name: name }))}>
+            Lưu
+          </Button>
+          <Button onClick={() => setMode(null)}>Hủy</Button>
+        </Row>
+      </FormDialog>
     </Card>
   );
 }
@@ -188,21 +297,51 @@ function Students() {
 function Grades() {
   const [form, setForm] = useState({ student_code: "", course_code: "", score: "", term: "" });
   const [msg, setMsg] = useState<string | null>(null);
-  const save = useAction(() => setMsg("Đã lưu điểm."));
+  const [open, setOpen] = useState(false);
+  const save = useAction(() => {
+    setMsg("Đã lưu điểm.");
+    setOpen(false);
+  });
   const imp = useAction();
   return (
-    <Card title="Nhập điểm">
-      <Row>
-        <input placeholder="Mã SV" value={form.student_code} onChange={(e) => setForm({ ...form, student_code: e.target.value })} size={10} />
-        <input placeholder="Mã học phần" value={form.course_code} onChange={(e) => setForm({ ...form, course_code: e.target.value })} size={10} />
-        <input type="number" step="0.1" min={0} max={10} placeholder="Điểm" value={form.score} onChange={(e) => setForm({ ...form, score: e.target.value })} style={{ width: "5rem" }} />
-        <input placeholder="Học kỳ" value={form.term} onChange={(e) => setForm({ ...form, term: e.target.value })} size={10} />
-        <Button variant="primary" disabled={save.busy || !form.student_code || !form.course_code || form.score === ""} onClick={() => void save.run(() => send("PUT", "/api/admin/lms/grades", { ...form, score: Number(form.score) }))}>
-          Lưu điểm
+    <Card
+      title="Nhập điểm"
+      className="bg-background"
+      actions={
+        <Button
+          variant="primary"
+          onClick={() => {
+            setForm({ student_code: "", course_code: "", score: "", term: "" });
+            save.clearError();
+            setOpen(true);
+          }}
+        >
+          Thêm điểm
         </Button>
-      </Row>
-      <ErrorText message={save.error} />
-      <Field label="Hoặc nhập từ CSV" hint="Cột: student_code, course_code, score, term (tùy chọn)">
+      }
+    >
+      <FormDialog title="Nhập điểm" open={open} onOpenChange={setOpen}>
+        <Field label="Mã sinh viên" required>
+          <input value={form.student_code} onChange={(e) => setForm({ ...form, student_code: e.target.value })} />
+        </Field>
+        <Field label="Mã học phần" required>
+          <input value={form.course_code} onChange={(e) => setForm({ ...form, course_code: e.target.value })} />
+        </Field>
+        <Field label="Điểm" required>
+          <input type="number" step="0.1" min={0} max={10} value={form.score} onChange={(e) => setForm({ ...form, score: e.target.value })} />
+        </Field>
+        <Field label="Học kỳ">
+          <input value={form.term} onChange={(e) => setForm({ ...form, term: e.target.value })} />
+        </Field>
+        <ErrorText message={save.error} />
+        <Row>
+          <Button disabled={save.busy || !form.student_code || !form.course_code || form.score === ""} onClick={() => void save.run(() => send("PUT", "/api/admin/lms/grades", { ...form, score: Number(form.score) }))}>
+            Lưu điểm
+          </Button>
+          <Button onClick={() => setOpen(false)}>Hủy</Button>
+        </Row>
+      </FormDialog>
+      <Field label="Hoặc nhập từ CSV">
         <FilePicker
           label="Chọn tệp CSV"
           accept=".csv"

@@ -6,7 +6,9 @@ import { query } from "@/lib/http";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, MILESTONE_STATUS, fmtDate } from "@/lib/labels";
 import type { ListRow } from "@/lib/types";
-import { Async, Badge, Card, Empty, Field, Page, Row, StatusBadge, Table } from "@/components/ui/ui";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Async, Badge, Card, DownloadButton, Empty, Field, Page, Row, StatusBadge, Table } from "@/components/ui/ui";
 
 // Danh sách tổng hợp có lọc theo trạng thái, mốc, rủi ro; xuất CSV (A11).
 export default function InternshipList({ base, fixedStatus, title }: { base: "/lecturer" | "/admin"; fixedStatus?: string; title?: string }) {
@@ -18,7 +20,7 @@ export default function InternshipList({ base, fixedStatus, title }: { base: "/l
   const state = useApi<ListRow[]>(`/api/internships${qs}`);
 
   return (
-    <Page title={title ?? "Danh sách hồ sơ thực tập"} actions={<a href={`/api/internships/export.csv${qs}`}>Xuất CSV</a>}>
+    <Page title={title ?? "Danh sách hồ sơ thực tập"} actions={<DownloadButton href={`/api/internships/export.csv${qs}`}>Xuất CSV</DownloadButton>}>
       <Card title="Bộ lọc">
         <Row>
           {!fixedStatus && (
@@ -64,7 +66,7 @@ export default function InternshipList({ base, fixedStatus, title }: { base: "/l
             rows.length === 0 ? (
               <Empty>Không có hồ sơ phù hợp.</Empty>
             ) : (
-              <Table head={["Sinh viên", "Doanh nghiệp", "GV", "Trạng thái", "Thời gian", "Mốc quá hạn", "Chờ duyệt", "Cờ", ""]}>
+              <Table head={["Sinh viên", "Doanh nghiệp", "GV", "Trạng thái", "Thời gian", "Quá hạn", "Chờ duyệt", ""]}>
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>
@@ -74,17 +76,19 @@ export default function InternshipList({ base, fixedStatus, title }: { base: "/l
                     </td>
                     <td>{r.company_name || "—"}</td>
                     <td>{r.lecturer_name ?? "—"}</td>
-                    <td>
+                    <td className="whitespace-nowrap">
                       <StatusBadge kind="internship" value={r.status} />
                     </td>
-                    <td>
-                      {fmtDate(r.start_date)} → {fmtDate(r.end_date)}
+                    <td className="whitespace-nowrap">
+                      {fmtDate(r.start_date)}
+                      <br />→ {fmtDate(r.end_date)}
                     </td>
-                    <td>{r.overdue_milestones > 0 ? <Badge tone="bad">{r.overdue_milestones}</Badge> : 0}</td>
-                    <td>{r.submitted_milestones}</td>
-                    <td>{r.open_flags > 0 ? <Badge tone="warn">{r.open_flags}</Badge> : 0}</td>
-                    <td>
-                      <Link href={`${base}/internships/${r.id}`}>Mở</Link>
+                    <td className="whitespace-nowrap text-center">{r.overdue_milestones > 0 ? <Badge tone="bad">{r.overdue_milestones}</Badge> : 0}</td>
+                    <td className="whitespace-nowrap text-center">{r.submitted_milestones}</td>
+                    <td className="whitespace-nowrap">
+                      <Link href={`${base}/internships/${r.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "border-2 border-foreground/25 no-underline")}>
+                        Mở
+                      </Link>
                     </td>
                   </tr>
                 ))}

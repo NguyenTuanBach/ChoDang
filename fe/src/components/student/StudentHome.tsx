@@ -44,7 +44,7 @@ function AskAssistant() {
   const { askInDock, assistant } = useAssistantContext();
   const busy = assistant.state.activeTurnId !== null;
   return (
-    <Card title="Hỏi Trợ lý" description="Trả lời theo quy chế, kèm căn cứ">
+    <Card title="Hỏi Trợ lý">
       <div className="flex flex-col gap-2">
         {ASK.map((q) => (
           <button
@@ -155,7 +155,7 @@ export default function StudentHome() {
                     )}
                   </Card>
 
-                  <Card title="Mốc thực tập" description="Theo thứ tự hạn nộp">
+                  <Card title="Mốc thực tập">
                     {d.milestones.length === 0 ? (
                       <Empty>Chưa có mốc: mốc được tạo sau khi giảng viên xác nhận hồ sơ.</Empty>
                     ) : (

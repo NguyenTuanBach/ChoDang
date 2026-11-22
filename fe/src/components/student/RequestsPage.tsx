@@ -15,9 +15,6 @@ export default function RequestsPage() {
     <Page title="Gia hạn và ngoại lệ">
       <Card title="Gửi yêu cầu ngoại lệ">
         <Async state={types}>{(list) => <ExceptionForm types={list} onDone={requests.reload} />}</Async>
-        <p>
-          <small>Để xin gia hạn một mốc, vào trang “Mốc & minh chứng”.</small>
-        </p>
       </Card>
       <Card title="Yêu cầu của tôi">
         <Async state={requests}>

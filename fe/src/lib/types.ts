@@ -67,6 +67,8 @@ export type Evidence = {
   size_bytes: number;
   status: string;
   reviewer_comment: string;
+  submitted_at: string;
+  reviewed_at: string | null;
 };
 
 export type Attachment = { id: number; filename: string; mime: string; size_bytes: number };
@@ -186,6 +188,10 @@ export type Account = {
   status: "invited" | "active" | "revoked";
   student_code: string | null;
   advisor_id: number | null;
+  /** Thời điểm mời (hoặc mời lại) gần nhất. */
+  invited_at: string | null;
+  /** Lời mời còn "invited" nhưng đã quá 3 giờ (BE tính). */
+  invitation_expired: boolean;
 };
 
 export type NotificationItem = { id: number; kind: string; title: string; body: string; link: string; created_at: string; read_at: string | null };

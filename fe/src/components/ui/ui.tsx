@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, Check, Circle, Clock, Inbox, X, type LucideIcon } from "lucide-react";
+import { AlertCircle, Check, Circle, Clock, Download, Inbox, X, type LucideIcon } from "lucide-react";
 import { useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Button as ShButton, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -34,19 +34,18 @@ export function Page({ title, description, actions, children }: { title: string;
   );
 }
 
-export function Card({ title, description, actions, children, className }: { title?: string; description?: string; actions?: ReactNode; children: ReactNode; className?: string }) {
+export function Card({ title, actions, children, className }: { title?: string; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-xl border-2 border-foreground/25 bg-card text-card-foreground shadow-xs", className)}>
+    <section className={cn("flex flex-col rounded-xl border-2 border-foreground/25 bg-background text-card-foreground shadow-xs", className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-foreground/25 px-4 py-2.5">
           <div className="min-w-0">
             {title && <h2 className="m-0 text-base font-semibold">{title}</h2>}
-            {description && <p className="m-0 mt-0.5 text-xs text-muted-foreground">{description}</p>}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className="flex-1 p-4">{children}</div>
     </section>
   );
 }
@@ -124,10 +123,17 @@ export function StatusBadge({ kind, value }: { kind: keyof typeof LABELS | "raw"
   return <Badge tone={TONES[value] ?? "neutral"}>{label}</Badge>;
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: ReactNode }) {
   return (
     <label className="mb-3 flex flex-col gap-1.5 text-sm [&>input]:w-full [&>select]:w-full [&>textarea]:w-full">
-      <span className="font-medium">{label}</span>
+      <span className="font-medium">
+        {label}
+        {required && (
+          <span className="ml-0.5 text-destructive" aria-hidden="true">
+            *
+          </span>
+        )}
+      </span>
       {children}
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </label>
@@ -151,10 +157,20 @@ export function Button({
       type="button"
       variant={BUTTON_VARIANT[variant]}
       {...props}
-      className={cn("h-9 px-3.5 text-sm shadow-xs", variant === "danger" && "bg-destructive text-white hover:bg-destructive/90", className)}
+      className={cn("h-9 px-3.5 text-sm shadow-xs", variant === "primary" && "border-2 border-foreground/25 bg-card text-foreground hover:bg-secondary", variant === "danger" && "bg-destructive text-white hover:bg-destructive/90", className)}
     >
       {children}
     </ShButton>
+  );
+}
+
+// Liên kết tải về trông như nút "Thêm" (nền be, viền đen nhạt).
+export function DownloadButton({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} download className={cn(buttonVariants({ variant: "outline" }), "h-9 px-3.5 text-sm shadow-xs border-2 border-foreground/25 bg-card text-foreground hover:bg-secondary")}>
+      <Download aria-hidden="true" className="size-4" />
+      {children}
+    </a>
   );
 }
 
@@ -203,7 +219,7 @@ export function Pre({ children }: { children: ReactNode }) {
 
 export function Table({ head, children }: { head: string[]; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <div className="overflow-x-auto rounded-xl border border-border bg-background">
       <table className="w-full border-collapse text-left text-sm">
         <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
@@ -305,6 +321,10 @@ export function FilePicker({ label, accept, disabled, onFile }: { label: string;
 // Thanh tiến độ chỉ có hai màu: xanh lá = đã hoàn thành/đạt, đỏ = chưa hoàn thành (đang làm, chờ, trượt, quá hạn...).
 const DONE_STATUS = new Set(["completed", "in_progress", "accepted", "approved", "lecturer_passed", "confirmed"]);
 
+export function isDoneStatus(status: string): boolean {
+  return DONE_STATUS.has(status);
+}
+
 export function outcomeBg(status: string): string {
   return DONE_STATUS.has(status) ? "bg-green-600" : "bg-red-600";
 }
@@ -392,7 +412,7 @@ export function StatCard({
       )}
     </div>
   );
-  const cls = "block rounded-xl border-2 border-foreground/25 bg-card p-4 text-card-foreground shadow-xs";
+  const cls = "block rounded-xl border-2 border-foreground/25 bg-background p-4 text-card-foreground shadow-xs";
   return href ? (
     <Link href={href} className={cn(cls, "transition-colors hover:bg-accent/60")}>
       {body}

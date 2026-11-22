@@ -5,7 +5,10 @@ import { send } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { ACCOUNT_STATUS } from "@/lib/labels";
 import type { Account } from "@/lib/types";
-import { Async, Button, Card, Empty, ErrorText, Field, OkText, Page, Row, StatusBadge, Table } from "@/components/ui/ui";
+import { Async, Badge, Button, Card, Empty, ErrorText, Field, OkText, Page, type Tone, Table } from "@/components/ui/ui";
+
+// Đang hoạt động = xanh lá; đã mời, chưa đăng nhập (còn hạn 3 giờ) = vàng (chờ); đã thu hồi/khóa hoặc lời mời hết hạn = đỏ.
+const ACCOUNT_TONE: Record<string, Tone> = { active: "good", invited: "warn", revoked: "bad" };
 
 type Props = { viewer: "admin" | "lecturer"; role: "lecturer" | "student"; title: string };
 
@@ -13,10 +16,35 @@ type Props = { viewer: "admin" | "lecturer"; role: "lecturer" | "student"; title
 export default function AccountsPanel({ viewer, role, title }: Props) {
   const accounts = useApi<Account[]>("/api/invitations");
   const lecturers = useApi<Account[]>(viewer === "admin" && role === "student" ? "/api/lecturers" : null);
+  // Mã SV sửa trực tiếp trong bảng; nút "Lưu" ở tiêu đề card lưu một lượt mọi dòng đã đổi.
+  const [codes, setCodes] = useState<Record<number, string>>({});
+  const changed = (accounts.data ?? []).filter((a) => a.role === "student" && codes[a.id] !== undefined && codes[a.id].trim() !== "" && codes[a.id] !== (a.student_code ?? ""));
+  const saveCodes = useAction(() => {
+    setCodes({});
+    accounts.reload();
+  });
   return (
     <Page title={title}>
       <InviteForm viewer={viewer} role={role} lecturers={lecturers.data ?? []} onDone={accounts.reload} />
-      <Card title="Danh sách">
+      <Card
+        title="Danh sách"
+        className="bg-background"
+        actions={
+          role === "student" ? (
+            <Button
+              variant="primary"
+              disabled={saveCodes.busy || changed.length === 0}
+              onClick={() =>
+                void saveCodes.run(async () => {
+                  for (const a of changed) await send("PUT", `/api/students/${a.id}/code`, { student_code: codes[a.id] });
+                })
+              }
+            >
+              Lưu
+            </Button>
+          ) : undefined
+        }
+      >
         <Async state={accounts}>
           {(all) => {
             const list = all.filter((a) => a.role === role);
@@ -25,12 +53,13 @@ export default function AccountsPanel({ viewer, role, title }: Props) {
             ) : (
               <Table head={role === "student" ? ["Email", "Họ tên", "Mã SV", "Giảng viên", "Trạng thái", ""] : ["Email", "Họ tên", "Trạng thái", ""]}>
                 {list.map((a) => (
-                  <AccountRow key={a.id} account={a} viewer={viewer} lecturers={lecturers.data ?? []} reload={accounts.reload} />
+                  <AccountRow key={a.id} account={a} viewer={viewer} lecturers={lecturers.data ?? []} reload={accounts.reload} code={codes[a.id] ?? a.student_code ?? ""} onCode={(v) => setCodes((c) => ({ ...c, [a.id]: v }))} />
                 ))}
               </Table>
             );
           }}
         </Async>
+        <ErrorText message={saveCodes.error} />
       </Card>
     </Page>
   );
@@ -53,6 +82,9 @@ function InviteForm({ viewer, role, lecturers, onDone }: { viewer: string; role:
       });
   }
 
+  // QTV mời sinh viên thì bắt buộc chọn giảng viên phụ trách (giảng viên mời thì tự là người phụ trách).
+  const needsAdvisor = viewer === "admin" && role === "student";
+
   async function invite() {
     setResult(null);
     await action.run(async () => {
@@ -67,14 +99,24 @@ function InviteForm({ viewer, role, lecturers, onDone }: { viewer: string; role:
   }
 
   return (
-    <Card title={role === "lecturer" ? "Mời giảng viên" : "Mời sinh viên"}>
-      <Field label="Danh sách email (mỗi dòng một người)" hint={role === "student" ? "Có thể thêm họ tên và mã sinh viên: email, họ tên, mã SV. Sinh viên đăng nhập bằng đúng email được mời." : "Có thể thêm họ tên: email, họ tên."}>
+    <Card
+      title={role === "lecturer" ? "Mời giảng viên" : "Mời sinh viên"}
+      className="bg-background"
+      actions={
+        <Button variant="primary" disabled={action.busy || !text.trim() || (needsAdvisor && !lecturerId)} onClick={() => void invite()}>
+          Gửi lời mời
+        </Button>
+      }
+    >
+      <Field label="Danh sách email (mỗi dòng một người)" required hint={role === "student" ? "Có thể thêm họ tên và mã sinh viên: email, họ tên, mã SV. Sinh viên đăng nhập bằng đúng email được mời." : "Có thể thêm họ tên: email, họ tên."}>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={role === "student" ? "sv1@truong.edu.vn, Nguyễn Văn A, SV0010" : "gv1@truong.edu.vn, Cô Lan"} />
       </Field>
       {viewer === "admin" && role === "student" && (
-        <Field label="Giảng viên phụ trách">
+        <Field label="Giảng viên phụ trách" required>
           <select value={lecturerId} onChange={(e) => setLecturerId(e.target.value)}>
-            <option value="">Chưa phân công</option>
+            <option value="" disabled>
+              Chọn giảng viên
+            </option>
             {lecturers.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.full_name || l.email}
@@ -85,16 +127,14 @@ function InviteForm({ viewer, role, lecturers, onDone }: { viewer: string; role:
       )}
       <ErrorText message={action.error} />
       <OkText message={result} />
-      <Button variant="primary" disabled={action.busy || !text.trim()} onClick={() => void invite()}>
-        Gửi lời mời
-      </Button>
     </Card>
   );
 }
 
-function AccountRow({ account: a, viewer, lecturers, reload }: { account: Account; viewer: string; lecturers: Account[]; reload: () => void }) {
+function AccountRow({ account: a, viewer, lecturers, reload, code, onCode }: { account: Account; viewer: string; lecturers: Account[]; reload: () => void; code: string; onCode: (value: string) => void }) {
   const action = useAction(reload);
-  const [code, setCode] = useState(a.student_code ?? "");
+  // Lời mời có hạn 3 giờ: còn hạn thì được thu hồi; quá hạn thì hiện "Từ chối" (đỏ) và chỉ còn nút "Mời lại".
+  const expired = a.status === "invited" && a.invitation_expired;
   return (
     <tr>
       <td>{a.email}</td>
@@ -102,17 +142,16 @@ function AccountRow({ account: a, viewer, lecturers, reload }: { account: Accoun
       {a.role === "student" && (
         <>
           <td>
-            <Row>
-              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Mã SV" size={9} />
-              <Button disabled={action.busy || !code.trim() || code === (a.student_code ?? "")} onClick={() => void action.run(() => send("PUT", `/api/students/${a.id}/code`, { student_code: code }))}>
-                Lưu
-              </Button>
-            </Row>
+            <input className="w-28" value={code} onChange={(e) => onCode(e.target.value)} placeholder="Mã SV" />
           </td>
           <td>
             {viewer === "admin" ? (
               <select value={a.advisor_id ?? ""} onChange={(e) => e.target.value && void action.run(() => send("PUT", `/api/students/${a.id}/advisor`, { lecturer_id: Number(e.target.value) }))}>
-                <option value="">Chưa phân công</option>
+                {a.advisor_id == null && (
+                  <option value="" disabled>
+                    Chọn giảng viên
+                  </option>
+                )}
                 {lecturers.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.full_name || l.email}
@@ -126,21 +165,21 @@ function AccountRow({ account: a, viewer, lecturers, reload }: { account: Accoun
         </>
       )}
       <td>
-        <StatusBadge kind="raw" value={ACCOUNT_STATUS[a.status] ?? a.status} />
+        {expired ? <Badge tone="bad">Từ chối (hết hạn lời mời)</Badge> : <Badge tone={ACCOUNT_TONE[a.status] ?? "neutral"}>{ACCOUNT_STATUS[a.status] ?? a.status}</Badge>}
       </td>
       <td>
-        <Row>
-          {a.status !== "revoked" && (
+        <div className="flex flex-nowrap items-center gap-2">
+          {a.status !== "revoked" && !expired && (
             <Button disabled={action.busy} onClick={() => void action.run(() => send("POST", `/api/invitations/${a.id}/revoke`, { reason: a.status === "invited" ? "Thu hồi lời mời" : "Khóa tài khoản" }))}>
               {a.status === "invited" ? "Thu hồi lời mời" : "Khóa"}
             </Button>
           )}
-          {(a.status === "revoked" || a.status === "invited") && (
+          {(a.status === "revoked" || expired) && (
             <Button disabled={action.busy} onClick={() => void action.run(() => send("POST", `/api/invitations/${a.id}/reinvite`))}>
               Mời lại
             </Button>
           )}
-        </Row>
+        </div>
         <ErrorText message={action.error} />
       </td>
     </tr>
