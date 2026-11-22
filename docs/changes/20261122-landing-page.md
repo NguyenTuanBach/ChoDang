@@ -11,6 +11,8 @@ Trang `/` trước đây chỉ chuyển hướng theo vai trò; người chưa �
 - Viền thẻ: 2px, màu chữ ở 25% độ đậm (`border-foreground/25`) ở `Card`, `StatCard`, hàng hàng chờ, đăng nhập, Trợ lý nổi, landing; card nhỏ lồng trong card lớn nền trắng viền mỏng.
 - Thanh tiến độ (`ProgressBar`, thanh phân bố ở `QueuePanel`): xanh lá = hoàn thành, đỏ = chưa hoàn thành, danh sách `DONE_STATUS` trong `ui.tsx`.
 
+- Các trang quản trị/giảng viên: card trắng viền đen nhạt; popup Thêm/Sửa (`ui/dialog.tsx`, `ui/search-select.tsx`) cho LMS và Cấu hình; menu ba chấm cho cờ rủi ro; bộ lọc hàng chờ; biểu đồ tròn/cột (`ui/charts.tsx`) và card Rủi ro ở `/dashboard`; chi tiết hồ sơ gộp thông tin vào card đầu, minh chứng gần nhất kèm cột "Cập nhật".
+
 ## Kiểm tra
 - `tsc --noEmit` và `eslint` sạch; `GET /` trả 200. Xem bằng mắt qua ảnh chụp do người dùng gửi.
 

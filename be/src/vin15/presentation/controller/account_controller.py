@@ -23,6 +23,8 @@ def _account(user: User) -> dict:
         "status": user.status.value,
         "student_code": user.student_code,
         "advisor_id": user.advisor_id,
+        "invited_at": user.invited_at.isoformat() if user.invited_at else None,
+        "invitation_expired": user.invitation_expired(),
     }
 
 

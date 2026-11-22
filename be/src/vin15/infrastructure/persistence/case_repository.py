@@ -334,7 +334,7 @@ class CaseRepository:
         with self._db.connection() as conn:
             return conn.execute(
                 "select e.id, e.milestone_id, m.code as milestone_code, e.title, e.filename, e.mime, e.size_bytes, e.status, "
-                "e.reviewer_comment, e.submitted_at from evidence e join milestone m on m.id = e.milestone_id "
+                "e.reviewer_comment, e.submitted_at, e.reviewed_at from evidence e join milestone m on m.id = e.milestone_id "
                 "where m.internship_id = %s order by m.code, e.id",
                 (internship_id,),
             ).fetchall()

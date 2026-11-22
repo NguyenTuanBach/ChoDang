@@ -1,6 +1,6 @@
 """Kích hoạt tài khoản ở lần đăng nhập đầu tiên (``invited`` → ``active``). Đăng nhập dev và Google OAuth cùng dùng.
 
-Email chưa được mời (không có tài khoản) hoặc đã bị thu hồi thì không có hiệu lực (D9).
+Email chưa được mời (không có tài khoản), đã bị thu hồi hoặc lời mời quá hạn 3 giờ thì không có hiệu lực (D9); mời lại để đặt lại hạn.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ class AccountActivationService:
             raise AuthenticationRequiredError("Email này chưa được mời vào hệ thống")
         if user.status == UserStatus.REVOKED:
             raise AuthenticationRequiredError("Lời mời đã bị thu hồi hoặc tài khoản đã bị khóa")
+        if user.invitation_expired():
+            raise AuthenticationRequiredError("Lời mời đã hết hạn (quá 3 giờ), hãy nhờ người mời gửi lại lời mời")
         if user.status == UserStatus.INVITED:
             user = self._users.set_status(
                 user.id,

@@ -24,10 +24,11 @@ def _to_user(row: dict) -> User:
         invited_by=row["invited_by"],
         student_code=row.get("student_code"),
         advisor_id=row.get("advisor_id"),
+        invited_at=row.get("invited_at"),
     )
 
 
-_COLUMNS = "id, email, full_name, role, status, invited_by, student_code, advisor_id"
+_COLUMNS = "id, email, full_name, role, status, invited_by, student_code, advisor_id, invited_at"
 _FINAL_STATUSES = ("completed", "closed_no_credit", "rejected")
 
 
@@ -123,9 +124,10 @@ class UserRepository:
             if only_from and UserStatus(current["status"]) not in only_from:
                 raise StateConflictError("Trạng thái tài khoản không cho phép thao tác này")
             row = conn.execute(
-                "update app_user set status = %s, activated_at = case when %s = 'active' and activated_at is null then now() else activated_at end "
+                "update app_user set status = %s, activated_at = case when %s = 'active' and activated_at is null then now() else activated_at end, "
+                "invited_at = case when %s = 'invited' then now() else invited_at end "
                 f"where id = %s returning {_COLUMNS}",
-                (status.value, status.value, user_id),
+                (status.value, status.value, status.value, user_id),
             ).fetchone()
             insert_audit(conn, _with_entity_id(audit, user_id))
         return _to_user(row)
