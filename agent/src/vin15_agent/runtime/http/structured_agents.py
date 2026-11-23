@@ -19,6 +19,7 @@ from vin15_agent.core.structured import StructuredOutputError
 from vin15_agent.intake import IntakeExtractor
 from vin15_agent.journal_advice import JournalAdvisor
 from vin15_agent.monitor import MonitorReviewer
+from vin15_agent.outline_review import OutlineReviewer
 from vin15_agent.pre_review import PreReviewer
 from vin15_agent.shared.settings import Settings
 
@@ -41,6 +42,7 @@ def register_structured_agents(app: FastAPI, *, settings: Settings, ai: AiClient
     monitor = MonitorReviewer(ai, loader)
     pre_review = PreReviewer(ai, loader)
     journal_advice = JournalAdvisor(ai, loader)
+    outline_review = OutlineReviewer(ai, loader)
 
     async def guarded(coro) -> dict[str, Any]:
         try:
@@ -63,6 +65,10 @@ def register_structured_agents(app: FastAPI, *, settings: Settings, ai: AiClient
     @app.post("/v1/monitor/review", dependencies=[Depends(require_service_token)])
     async def monitor_review(body: dict[str, Any]) -> dict:
         return await guarded(monitor.review(body))
+
+    @app.post("/v1/outline/review", dependencies=[Depends(require_service_token)])
+    async def outline_review_endpoint(body: dict[str, Any]) -> dict:
+        return await guarded(outline_review.review(body))
 
     @app.post("/v1/journal/advice", dependencies=[Depends(require_service_token)])
     async def journal_advice_endpoint(body: dict[str, Any]) -> dict:

@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, FileText } from "lucide-react";
+import { Check, FileText, Minus } from "lucide-react";
 import { useState } from "react";
-import AutofillPrompt from "@/components/shared/AutofillPrompt";
+import FormDialog from "@/components/ui/dialog";
 import { usePendingAutofill, type PendingAutofill } from "@/lib/autofill";
 import { send, upload } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
@@ -11,6 +11,7 @@ import type { InternshipDetail, Milestone } from "@/lib/types";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, Page, Row, StatusBadge } from "@/components/ui/ui";
 import { cn } from "@/lib/utils";
 import EvidenceFieldsForm from "./EvidenceFieldsForm";
+import EvidencePreviewDialog from "./EvidencePreviewDialog";
 
 //: Mốc có giấy xác nhận / phiếu đánh giá của doanh nghiệp: AI đọc giấy để điền thông tin.
 const COMPLETION_CODE = "M5";
@@ -90,17 +91,26 @@ function MilestoneStep({
   const overdue = !done && m.days_left < 0;
   const up = useAction(reload);
   const submit = useAction(reload);
+  // Minh chứng đang chờ SV xác nhận thu hồi (popup xác nhận).
+  const [withdrawTarget, setWithdrawTarget] = useState<{ id: number; n: number } | null>(null);
+  const withdraw = useAction(() => {
+    setWithdrawTarget(null);
+    reload();
+  });
   const [extending, setExtending] = useState(false);
-  const [prompt, setPrompt] = useState<number | null>(null);
   const [autoExtractId, setAutoExtractId] = useState<number | null>(null);
-  const isCompletion = m.code === COMPLETION_CODE;
+  // Tệp vừa chọn, chờ xem lại trong popup rồi mới tải lên.
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  // Còn thu hồi được (mốc chưa nộp/chấp nhận): các dòng minh chứng chừa chỗ cho nút dấu trừ để thẳng hàng.
+  const canWithdraw = working && !locked;
 
+  // Minh chứng dạng PDF/ảnh (mọi mốc): tải lên xong thì AI đọc luôn và điền sẵn form "Thông tin trên giấy" (SV kiểm rồi xác nhận).
   async function uploadEvidence(file: File) {
     let id: number | null = null;
     const ok = await up.run(async () => {
       id = (await upload<{ id: number }>(`/api/student/milestones/${m.code}/evidence`, file)).id;
     });
-    if (ok && id !== null && isCompletion && /\.(pdf|png|jpe?g)$/i.test(file.name)) setPrompt(id);
+    if (ok && id !== null && /\.(pdf|png|jpe?g)$/i.test(file.name)) setAutoExtractId(id);
   }
 
   return (
@@ -142,7 +152,8 @@ function MilestoneStep({
             {evidence.map((e, i) => {
               const failed = e.status === "rejected";
               return (
-                <div key={e.id} className="rounded-lg border border-foreground/15 bg-background px-3 py-2.5">
+                <div key={e.id} className="flex items-start gap-2">
+                <div className="min-w-0 flex-1 rounded-lg border border-foreground/15 bg-background px-3 py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold">{i + 1}</span>
@@ -164,7 +175,7 @@ function MilestoneStep({
                       {e.reviewer_comment}
                     </p>
                   )}
-                  {isCompletion && !failed && (
+                  {!failed && (
                     <div className="mt-2">
                       <EvidenceFieldsForm
                         key={`${e.id}-${autofill?.evidenceId === e.id ? autofillNonce : 0}-${autoExtractId === e.id ? 1 : 0}`}
@@ -180,16 +191,58 @@ function MilestoneStep({
                     </div>
                   )}
                 </div>
+                {canWithdraw &&
+                  (e.status === "submitted" ? (
+                    // Nút dấu trừ nằm ngay bên phải dòng minh chứng (trong thẻ mốc), thẳng hàng với dòng đầu của nó.
+                    <button
+                      type="button"
+                      aria-label={`Thu hồi Lần ${i + 1}`}
+                      title="Thu hồi"
+                      onClick={() => setWithdrawTarget({ id: e.id, n: i + 1 })}
+                      className="mt-2.5 flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-red-600 bg-background text-red-600 transition-colors hover:bg-red-600 hover:text-white"
+                    >
+                      <Minus aria-hidden className="size-3.5" strokeWidth={3} />
+                    </button>
+                  ) : (
+                    <span aria-hidden className="size-6 shrink-0" />
+                  ))}
+                </div>
               );
             })}
           </div>
         )}
+        <FormDialog title="Thu hồi minh chứng" open={withdrawTarget !== null} onOpenChange={(open) => !open && !withdraw.busy && setWithdrawTarget(null)}>
+          <p className="m-0 text-sm">
+            Thu hồi <strong>Lần {withdrawTarget?.n}</strong> của mốc {m.code}? Tệp sẽ bị xóa khỏi hệ thống và giảng viên không còn thấy nó. Bạn có thể tải lại tệp khác sau đó.
+          </p>
+          <ErrorText message={withdraw.error} />
+          <div className="mt-4">
+            <Row>
+              <Button variant="danger" disabled={withdraw.busy} onClick={() => withdrawTarget && void withdraw.run(() => send("POST", `/api/student/evidence/${withdrawTarget.id}/withdraw`))}>
+                {withdraw.busy ? "Đang thu hồi..." : "Thu hồi"}
+              </Button>
+              <Button disabled={withdraw.busy} onClick={() => setWithdrawTarget(null)}>
+                Giữ lại
+              </Button>
+            </Row>
+          </div>
+        </FormDialog>
         <ErrorText message={up.error ?? submit.error} />
 
         {m.submittable && working && !locked && (
           <div className="mt-4">
             <Row>
-              <FilePicker label="Tải minh chứng" accept=".pdf,.png,.jpg,.jpeg,.docx" disabled={up.busy} onFile={(file) => void uploadEvidence(file)} />
+              <FilePicker label="Tải minh chứng" accept=".pdf,.png,.jpg,.jpeg,.docx" disabled={up.busy} onFile={(file) => setPreviewFile(file)} />
+              <EvidencePreviewDialog
+                file={previewFile}
+                busy={up.busy}
+                onCancel={() => setPreviewFile(null)}
+                onConfirm={() => {
+                  const file = previewFile;
+                  if (!file) return;
+                  void uploadEvidence(file).then(() => setPreviewFile(null));
+                }}
+              />
               <Button variant="primary" disabled={submit.busy || evidence.filter((e) => e.status !== "rejected").length === 0} onClick={() => void submit.run(() => send("POST", `/api/student/milestones/${m.code}/submit`))}>
                 Nộp mốc
               </Button>
@@ -202,14 +255,6 @@ function MilestoneStep({
             <Button onClick={() => setExtending((v) => !v)}>{extending ? "Đóng" : "Xin gia hạn"}</Button>
           </div>
         )}
-        <AutofillPrompt
-          open={prompt !== null}
-          onYes={() => {
-            setAutoExtractId(prompt);
-            setPrompt(null);
-          }}
-          onNo={() => setPrompt(null)}
-        />
         {extending && (
           <ExtensionForm
             milestone={m}

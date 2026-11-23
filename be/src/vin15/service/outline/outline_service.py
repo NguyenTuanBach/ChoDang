@@ -31,7 +31,7 @@ class OutlineService:
         require_view_internship(viewer, row["user_id"], row["lecturer_id"])
         return self._cases.outlines(internship_id)
 
-    def submit(self, student: User, content: str, outcome_codes: list[str]) -> int:
+    def submit(self, student: User, content: str, outcome_codes: list[str], ai_review: dict | None = None) -> int:
         row = self._cases.student_internship(student.id)
         if row is None or row["status"] != "confirmed":
             raise StateConflictError("Chỉ nộp được đề cương khi hồ sơ đã được giảng viên xác nhận")
@@ -55,6 +55,7 @@ class OutlineService:
                 after={"status": "submitted", "internship_id": row["id"]},
                 reason="Sinh viên nộp đề cương",
             ),
+            ai_review=ai_review,
         )
         if row["lecturer_id"]:
             self._notifications.notify(

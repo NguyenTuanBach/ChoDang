@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 from vin15.domain.authorization import actor_of, require_view_internship
@@ -117,6 +118,34 @@ class MilestoneService:
         if milestone is not None and milestone["status"] in ("submitted", "accepted"):
             raise StateConflictError("Mốc đã nộp hoặc đã được chấp nhận, không sửa thông tin giấy")
         return ev
+
+    def withdraw_evidence(self, student: User, evidence_id: int) -> None:
+        """Sinh viên thu hồi (xóa) minh chứng của mình khi nó còn chờ duyệt và mốc chưa nộp / chưa được chấp nhận.
+
+        Minh chứng đã bị trả lại (lịch sử "Thất bại") hoặc đã được chấp nhận thì không thu hồi được. Tệp bị xóa khỏi kho; dấu vết ghi ở audit.
+        """
+        ev = self._cases.get_evidence(evidence_id)
+        if ev is None or ev["owner_id"] != student.id:
+            raise ResourceNotFoundError("Không tìm thấy minh chứng")
+        internship = self._cases.get_internship(ev["internship_id"])
+        if internship is None or internship["status"] not in _WORKING:
+            raise StateConflictError("Chỉ thu hồi minh chứng khi đang thực tập")
+        if ev["status"] != "submitted":
+            raise StateConflictError("Chỉ thu hồi được minh chứng đang chờ duyệt")
+        milestone = self._cases.milestone_by_code(ev["internship_id"], ev["milestone_code"])
+        if milestone is not None and milestone["status"] in ("submitted", "accepted"):
+            raise StateConflictError("Mốc đã nộp hoặc đã được chấp nhận, hãy nhờ giảng viên trả lại mốc nếu cần sửa")
+        self._cases.delete_evidence(
+            evidence_id,
+            AuditEntry(actor_kind=ActorKind.HUMAN, actor_id=student.id, actor_role=student.role.value, entity="evidence", action="withdraw",
+                       before={"filename": ev["filename"], "milestone": ev["milestone_code"], "status": ev["status"]},
+                       reason="Sinh viên thu hồi minh chứng"),
+        )
+        if ev["storage_key"]:
+            try:
+                self._storage.delete(ev["storage_key"])
+            except Exception:  # noqa: BLE001 - tệp mồ côi không được làm hỏng thao tác đã ghi DB
+                logging.getLogger(__name__).warning("Không xóa được tệp minh chứng %s", ev["storage_key"], exc_info=True)
 
     def confirm_evidence_fields(self, student: User, evidence_id: int, fields: dict[str, str], confirmations: dict[str, str]) -> dict:
         """SV xác nhận các trường đọc từ giấy xác nhận / phiếu đánh giá; BE đối chiếu với hồ sơ và lưu cảnh báo cho GV."""

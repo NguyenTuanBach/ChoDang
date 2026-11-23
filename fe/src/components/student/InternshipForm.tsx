@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import AutofillPrompt from "@/components/shared/AutofillPrompt";
 import { PULSE, usePendingAutofill, type PendingAutofill, type Suggestion } from "@/lib/autofill";
 import { send, upload } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
@@ -9,6 +8,7 @@ import { MODE_LABEL, fmtDate } from "@/lib/labels";
 import type { Check, InternshipDetail } from "@/lib/types";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, OkText, Page, Row, StatusBadge } from "@/components/ui/ui";
 import DownloadDoc from "./DownloadDoc";
+import EvidencePreviewDialog from "./EvidencePreviewDialog";
 
 type Form = {
   company_name: string;
@@ -144,7 +144,8 @@ function Editor({
   const [warnings, setWarnings] = useState<string[]>(autofill?.warnings ?? []);
   // Nút Lưu nhấp nháy sau khi AI điền, cho tới khi người dùng bấm.
   const [pulseSave, setPulseSave] = useState(Boolean(autofill && editableAtStart));
-  const [prompt, setPrompt] = useState<number | null>(null);
+  // Tệp vừa chọn, chờ xem lại trong popup rồi mới tải lên.
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
   const saveRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (pulseSave) saveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -202,8 +203,10 @@ function Editor({
     await extract.run(async () => {
       const result = await send<{ fields: Record<string, Suggestion>; notes: string; warnings?: string[] }>("POST", `/api/student/internship/documents/${documentId}/extract`);
       setSuggestions(result.fields);
-      setNote(result.notes || null);
+      setNote(result.notes || (Object.keys(result.fields).length === 0 ? "AI không đọc được trường nào; hãy nhập tay." : null));
       setWarnings(result.warnings ?? []);
+      // Tự điền thẳng vào form (chưa lưu): người dùng kiểm tra rồi bấm "Lưu bản nháp".
+      if (Object.keys(result.fields).length > 0) accept(result.fields);
     });
   }
 
@@ -225,7 +228,8 @@ function Editor({
     const ok = await docs.run(async () => {
       id = (await upload<{ id: number }>("/api/student/internship/documents", file)).id;
     });
-    if (ok && id !== null) setPrompt(id);
+    // Tải xong thì AI đọc giấy ngay và tự điền form, không hỏi lại.
+    if (ok && id !== null) await runExtract(id);
   }
 
   const blocking = checks.filter((c) => !c.ok && c.level === "error");
@@ -291,7 +295,21 @@ function Editor({
               )}
             </Row>
           ))}
-          {editable && <FilePicker label="Tải giấy tiếp nhận" accept=".pdf,.png,.jpg,.jpeg" disabled={docs.busy} onFile={(file) => void uploadDoc(file)} />}
+          <Row>
+            <FilePicker label="Tải giấy tiếp nhận" accept=".pdf,.png,.jpg,.jpeg" disabled={!editable || docs.busy || extract.busy} onFile={(file) => setPreviewFile(file)} />
+            {!editable && <span className="text-sm text-muted-foreground">Hồ sơ đã nộp nên không tải thêm giấy tiếp nhận.</span>}
+          </Row>
+          <EvidencePreviewDialog
+            title="Xem lại giấy tiếp nhận"
+            file={previewFile}
+            busy={docs.busy}
+            onCancel={() => setPreviewFile(null)}
+            onConfirm={() => {
+              const file = previewFile;
+              if (!file) return;
+              void uploadDoc(file).then(() => setPreviewFile(null));
+            }}
+          />
           {extract.busy && <p className="text-sm text-muted-foreground">AI đang đọc giấy...</p>}
           <ErrorText message={docs.error ?? extract.error} />
           {note && <p>{note}</p>}
@@ -318,15 +336,6 @@ function Editor({
               ))}
             </>
           )}
-          <AutofillPrompt
-            open={prompt !== null}
-            onYes={() => {
-              const id = prompt;
-              setPrompt(null);
-              if (id !== null) void runExtract(id);
-            }}
-            onNo={() => setPrompt(null)}
-          />
         </Card>
       )}
 

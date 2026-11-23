@@ -192,12 +192,14 @@ export function OkText({ message }: { message: string | null }) {
   ) : null;
 }
 
-export function EmptyState({ title, children, icon: Icon = Inbox, action }: { title?: string; children?: ReactNode; icon?: LucideIcon; action?: ReactNode }) {
+export function EmptyState({ title, children, icon: Icon = Inbox, noIcon, action }: { title?: string; children?: ReactNode; icon?: LucideIcon; noIcon?: boolean; action?: ReactNode }) {
   return (
     <div className="my-1 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center">
-      <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Icon aria-hidden="true" className="size-5" />
-      </span>
+      {!noIcon && (
+        <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Icon aria-hidden="true" className="size-5" />
+        </span>
+      )}
       {title && <p className="m-0 text-sm font-medium">{title}</p>}
       {children && <p className="m-0 max-w-md text-sm text-muted-foreground">{children}</p>}
       {action}
@@ -369,7 +371,7 @@ export function Stepper({ steps }: { steps: JourneyStep[] }) {
 // Liên kết có dạng nút (dùng cho hành động chính điều hướng sang trang khác).
 export function LinkButton({ href, children, variant = "primary" }: { href: string; children: ReactNode; variant?: "primary" | "default" }) {
   return (
-    <Link href={href} className={cn(buttonVariants({ variant: variant === "primary" ? "default" : "outline", size: "lg" }), "h-9 px-4 shadow-xs")}>
+    <Link href={href} className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-9 border-2 border-foreground/25 px-4 text-foreground no-underline shadow-xs", variant === "primary" ? "bg-card hover:bg-secondary" : "bg-background hover:bg-muted")}>
       {children}
     </Link>
   );

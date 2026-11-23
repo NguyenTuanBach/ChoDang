@@ -45,6 +45,12 @@ export type Milestone = {
   submittable: boolean;
 };
 
+/** Một chỗ cần sửa trong đề cương: `error` = lỗi chắc chắn (chặn nộp), `warning` = góp ý của AI. */
+export type OutlineIssue = { section: string; message: string; level: "error" | "warning" };
+
+/** Nhận xét của AI khi nộp đề cương (chỉ gợi ý). `ai=false` nghĩa là agent chưa trả lời được. */
+export type OutlineReview = { summary: string; issues: OutlineIssue[]; ai: boolean };
+
 export type Outline = {
   id: number;
   version: number;
@@ -52,6 +58,7 @@ export type Outline = {
   outcome_codes: string[];
   status: string;
   feedback: string;
+  ai_review?: Partial<OutlineReview>;
   submitted_at: string;
 };
 

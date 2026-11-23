@@ -4,7 +4,7 @@ import { AlarmClock, Flag, Hourglass, Inbox, ShieldCheck, Users } from "lucide-r
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { Async, Badge, Button, Card, EmptyState, Page, StatCard, StatusBadge, outcomeBg } from "@/components/ui/ui";
+import { Async, Badge, Button, Card, EmptyState, Page, StatCard, isDoneStatus, outcomeBg } from "@/components/ui/ui";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, QUEUE_KIND, fmtDate, fmtDateTime } from "@/lib/labels";
 import type { Dashboard, QueueItem } from "@/lib/types";
@@ -39,7 +39,9 @@ const FILTERS: { key: string; label: string; match: (i: QueueItem) => boolean }[
 ];
 
 // Thanh xếp chồng phân bố hồ sơ theo trạng thái + chú giải (màu lấy từ bảng chart của chủ đề).
-function StatusDistribution({ rows }: { rows: { status: string; n: number }[] }) {
+function StatusDistribution({ rows: unsorted }: { rows: { status: string; n: number }[] }) {
+  // Cùng màu nằm liền nhau: xanh lá (hoàn thành/đang tốt) trước, đỏ (chưa hoàn thành) sau; trong mỗi nhóm giữ nguyên thứ tự.
+  const rows = [...unsorted].sort((a, b) => Number(isDoneStatus(b.status)) - Number(isDoneStatus(a.status)));
   const total = rows.reduce((s, r) => s + r.n, 0);
   if (total === 0) return <EmptyState>Chưa có hồ sơ nào trong phạm vi của bạn.</EmptyState>;
   return (
@@ -157,7 +159,7 @@ function QueueView({ base, initialFilter }: { base: "/lecturer" | "/admin"; init
                               <span className="block text-xs font-medium text-muted-foreground">{QUEUE_KIND[i.kind] ?? i.kind}</span>
                               <span className="block text-sm font-semibold">{i.student_name}</span>
                               <span className="block text-sm">
-                                {i.severity && <StatusBadge kind="severity" value={i.severity} />} {i.title}
+                                {i.title}
                               </span>
                             </span>
                             <span className="flex flex-col items-end gap-1 text-xs text-muted-foreground">

@@ -39,7 +39,7 @@ def create_app(
     ai_client = ai_client or AiClient.from_settings(settings)
     app = FastAPI(title="VIN-15 Agent API", version=__version__)
     app.state.ai_client = ai_client
-    agents = ["policy_assistant", "intake", "monitor", "pre_review", "journal_advice"]
+    agents = ["policy_assistant", "intake", "monitor", "pre_review", "journal_advice", "outline_review"]
     app.state.policy_assistant = register_policy_assistant(
         app, settings=settings, ai=ai_client, require_service_token=require_service_token, be_transport=be_transport
     )

@@ -5,7 +5,7 @@ import { FIELD_LABEL, PULSE, type PendingAutofill, type Suggestion } from "@/lib
 import { send } from "@/lib/http";
 import { useAction } from "@/lib/hooks";
 import type { Evidence, EvidenceMismatch } from "@/lib/types";
-import { Badge, Button, ErrorText, OkText, Row } from "@/components/ui/ui";
+import { Button, ErrorText, OkText, Row } from "@/components/ui/ui";
 
 // Trường của giấy xác nhận / phiếu đánh giá (khớp COMPLETION_FIELDS ở BE và agent).
 const FIELDS: { key: string; type?: string; wide?: boolean }[] = [
@@ -47,7 +47,6 @@ export default function EvidenceFieldsForm({
   const saved = evidence.extraction;
   const [values, setValues] = useState<Record<string, string>>(() => ({ ...(saved?.fields ?? {}), ...toValues(autofill?.fields) }));
   const [marks, setMarks] = useState<Record<string, string>>(() => ({ ...(saved?.confirmations ?? {}), ...toMarks(autofill?.fields) }));
-  const [confidence, setConfidence] = useState<Record<string, Suggestion>>(autofill?.fields ?? {});
   const [mismatches, setMismatches] = useState<EvidenceMismatch[]>(saved?.mismatches ?? []);
   const [pulse, setPulse] = useState(Boolean(autofill));
   const [open, setOpen] = useState(Boolean(autofill || autoExtract || saved));
@@ -62,7 +61,6 @@ export default function EvidenceFieldsForm({
       const result = await send<{ fields: Record<string, Suggestion>; notes: string }>("POST", `/api/student/evidence/${evidence.id}/extract`);
       setValues((v) => ({ ...v, ...toValues(result.fields) }));
       setMarks((m) => ({ ...m, ...toMarks(result.fields) }));
-      setConfidence(result.fields);
       setNote(result.notes || (Object.keys(result.fields).length === 0 ? "AI không đọc được trường nào; hãy nhập tay." : null));
       if (Object.keys(result.fields).length > 0) setPulse(true);
     });
@@ -114,23 +112,22 @@ export default function EvidenceFieldsForm({
       </div>
       {note && <p className="m-0 mb-2 text-sm text-muted-foreground">{note}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
-        {FIELDS.map((f) => {
-          const s = confidence[f.key];
-          return (
-            <label key={f.key} className={f.wide ? "sm:col-span-2" : undefined}>
-              <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                {FIELD_LABEL[f.key] ?? f.key}
-                {s && <Badge tone={s.confidence >= 0.8 ? "good" : "warn"}>AI {Math.round(s.confidence * 100)}%</Badge>}
-              </span>
-              {f.wide ? (
-                <textarea value={values[f.key] ?? ""} disabled={!editable} onChange={(e) => edit(f.key, e.target.value)} rows={3} />
-              ) : (
-                <input type={f.type ?? "text"} value={f.type === "date" ? (values[f.key] ?? "").slice(0, 10) : (values[f.key] ?? "")} disabled={!editable} onChange={(e) => edit(f.key, e.target.value)} />
-              )}
-              {s?.source && <small className="block truncate text-muted-foreground" title={s.source}>Nguồn: “{s.source}”</small>}
-            </label>
-          );
-        })}
+        {FIELDS.map((f) => (
+          <label key={f.key} className={f.wide ? "sm:col-span-2" : undefined}>
+            <span className="block text-xs text-muted-foreground">{FIELD_LABEL[f.key] ?? f.key}</span>
+            {f.wide ? (
+              <textarea className="mt-1 block w-full" value={values[f.key] ?? ""} disabled={!editable} onChange={(e) => edit(f.key, e.target.value)} rows={6} />
+            ) : (
+              <input
+                className="mt-1 block w-full"
+                type={f.type ?? "text"}
+                value={f.type === "date" ? (values[f.key] ?? "").slice(0, 10) : (values[f.key] ?? "")}
+                disabled={!editable}
+                onChange={(e) => edit(f.key, e.target.value)}
+              />
+            )}
+          </label>
+        ))}
       </div>
       {mismatches.length > 0 && (
         <div className="mt-3 space-y-1" role="alert">

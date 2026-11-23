@@ -7,7 +7,7 @@
 - **Đề tài**: `docs/problem-statement.md` (không đổi). Nghiệp vụ đã phân tích: `docs/nghiep-vu-thuc-tap.md` (bản nháp 0.1, có mã BR-*, A*, P*).
 - **Cấu trúc**: `be/` (FastAPI, cổng 8000, gói `vin15`) + `agent/` (service AI riêng, cổng 8100, gói `vin15_agent`) + `fe/` (Next.js, cổng 3000). Đọc `be/README.md`, `agent/README.md`, `fe/README.md`.
 - **Stack**: Python 3.12, uv, FastAPI, Pydantic v2, Postgres (Supabase) qua psycopg, migration SQL kiểu Flyway, SDK `openai`; FE Next.js (App Router, TypeScript, Tailwind CSS v4).
-- **Chạy** (không cần Docker): `scripts/start.sh` (BE + agent + FE cùng lúc, Ctrl+C dừng tất cả), hoặc riêng lẻ `make install`, `make be-run`, `make agent-run`, `make fe-run`. Test: `make test`. Lint: `make lint`.
+- **Chạy** (không cần Docker): `scripts/start.sh` (BE + agent + FE cùng lúc, Ctrl+C dừng tất cả; trên Windows dùng `powershell -ExecutionPolicy Bypass -File scripts\start.ps1`, thêm `-SkipAgent` để đỡ tốn RAM), hoặc riêng lẻ `make install`, `make be-run`, `make agent-run`, `make fe-run`. Test: `make test`. Lint: `make lint`.
   Gọi thử LLM thật: `make agent-llm-check`.
 - **Cấu hình**: `.env` ở gốc repo (mẫu `.env.example`), cả `be/` và `agent/` cùng đọc. BE không giữ khóa LLM, chỉ agent dùng.
 - **Lịch sử thay đổi**: `docs/changes/` (đọc file mới nhất để biết việc vừa làm và phần còn dở).

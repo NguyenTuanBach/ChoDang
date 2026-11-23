@@ -55,6 +55,7 @@ from vin15.service.milestone.milestone_service import MilestoneService
 from vin15.service.monitoring.monitoring_service import MonitoringService
 from vin15.service.monitoring.pre_review_service import PreReviewService
 from vin15.service.notification.notification_service import NotificationService
+from vin15.service.outline.outline_review_service import OutlineReviewService
 from vin15.service.outline.outline_service import OutlineService
 from vin15.service.policy.policy_ingest_service import PolicyIngestService
 from vin15.service.policy.policy_publish_service import PolicyPublishService
@@ -254,6 +255,10 @@ class Container:
     @cached_property
     def intake_service(self) -> IntakeService:
         return IntakeService(self.case_repository, self.file_storage, self.agent_client, self.internship_service, self.milestone_service)
+
+    @cached_property
+    def outline_review_service(self) -> OutlineReviewService:
+        return OutlineReviewService(self.outline_service, self.case_repository, self.agent_client, self.pii_redactor)
 
     @cached_property
     def outline_service(self) -> OutlineService:

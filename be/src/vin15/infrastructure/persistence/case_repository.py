@@ -245,7 +245,7 @@ class CaseRepository:
     def outlines(self, internship_id: int) -> list[dict]:
         with self._db.connection() as conn:
             return conn.execute(
-                "select id, internship_id, version, content, outcome_codes, status, feedback, submitted_at, decided_at "
+                "select id, internship_id, version, content, outcome_codes, status, feedback, ai_review, submitted_at, decided_at "
                 "from outline where internship_id = %s order by version desc",
                 (internship_id,),
             ).fetchall()
@@ -258,7 +258,7 @@ class CaseRepository:
                 (outline_id,),
             ).fetchone()
 
-    def add_outline(self, internship_id: int, content: str, outcome_codes: list[str], audit: AuditEntry) -> int:
+    def add_outline(self, internship_id: int, content: str, outcome_codes: list[str], audit: AuditEntry, ai_review: dict | None = None) -> int:
         with self._db.connection() as conn:
             conn.execute("select 1 from internship where id = %s for update", (internship_id,)).fetchone()
             pending = conn.execute("select 1 from outline where internship_id = %s and status = 'submitted'", (internship_id,)).fetchone()
@@ -266,8 +266,8 @@ class CaseRepository:
                 raise StateConflictError("Đề cương đang chờ giảng viên duyệt")
             version = conn.execute("select coalesce(max(version), 0) + 1 as v from outline where internship_id = %s", (internship_id,)).fetchone()["v"]
             row = conn.execute(
-                "insert into outline (internship_id, version, content, outcome_codes) values (%s, %s, %s, %s) returning id",
-                (internship_id, version, content, outcome_codes),
+                "insert into outline (internship_id, version, content, outcome_codes, ai_review) values (%s, %s, %s, %s, %s) returning id",
+                (internship_id, version, content, outcome_codes, Jsonb(ai_review or {})),
             ).fetchone()
             insert_audit(conn, _entity(audit, row["id"]))
         return row["id"]
@@ -395,6 +395,12 @@ class CaseRepository:
                 "mismatches = excluded.mismatches, confirmed_by = excluded.confirmed_by, confirmed_at = now()",
                 (evidence_id, Jsonb(fields), Jsonb(confirmations), Jsonb(mismatches), confirmed_by),
             )
+            insert_audit(conn, _entity(audit, evidence_id))
+
+    def delete_evidence(self, evidence_id: int, audit: AuditEntry) -> None:
+        """Xóa dòng minh chứng (dữ liệu AI đọc gắn kèm xóa theo, ON DELETE CASCADE); dấu vết còn ở bảng audit."""
+        with self._db.connection() as conn:
+            conn.execute("delete from evidence where id = %s", (evidence_id,))
             insert_audit(conn, _entity(audit, evidence_id))
 
     def count_active_evidence(self, milestone_id: int) -> int:

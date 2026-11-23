@@ -25,8 +25,9 @@ router = APIRouter(tags=["Đề cương, mốc, nhật ký, minh chứng"])
 
 # ---- Đề cương ----
 @router.post("/api/student/outlines", status_code=201, summary="Nộp đề cương (phiên bản mới)")
-def submit_outline(body: OutlineBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
-    return {"id": app.outline_service.submit(student, body.content, body.outcome_codes)}
+async def submit_outline(body: OutlineBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    # Có lỗi chắc chắn thì saved=false (không lưu) kèm chỗ sai và nhận xét AI; chuẩn đầu ra do AI nhận diện, không còn tích tay.
+    return await app.outline_review_service.submit(student, body.content)
 
 
 @router.post("/api/outlines/{outline_id}/decision", status_code=204, summary="GV duyệt / yêu cầu sửa / từ chối đề cương (HITL)")
@@ -59,6 +60,11 @@ async def extract_evidence(evidence_id: int, student: User = Depends(student_use
 @router.put("/api/student/evidence/{evidence_id}/fields", summary="SV xác nhận thông tin trên giấy; BE đối chiếu với hồ sơ")
 def confirm_evidence_fields(evidence_id: int, body: EvidenceFieldsBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
     return app.milestone_service.confirm_evidence_fields(student, evidence_id, body.fields, body.confirmations)
+
+
+@router.post("/api/student/evidence/{evidence_id}/withdraw", status_code=204, summary="SV thu hồi (xóa) minh chứng đang chờ duyệt của mốc chưa nộp")
+def withdraw_evidence(evidence_id: int, student: User = Depends(student_user), app: Container = Depends(container)) -> None:
+    app.milestone_service.withdraw_evidence(student, evidence_id)
 
 
 @router.post("/api/student/intake/auto", summary="Đính kèm giấy trong Trợ lý: AI nhận loại giấy, lưu vào đúng chỗ, trả gợi ý trường")
