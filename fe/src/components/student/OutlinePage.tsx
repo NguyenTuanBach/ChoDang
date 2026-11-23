@@ -24,6 +24,13 @@ function Content({ detail, reload }: { detail: InternshipDetail; reload: () => v
   const pending = detail.outlines.some((o) => o.status === "submitted");
   const canSubmit = row?.status === "confirmed" && !pending;
   const outcomes = detail.outcomes ?? [];
+  // Lý do chưa nộp được (form vẫn hiện nhưng khóa): đề cương chỉ nộp khi giảng viên đã xác nhận hồ sơ và chưa có bản đang chờ duyệt.
+  const blockedReason =
+    row?.status === "draft" || row?.status === "submitted" || row?.status === "revision_requested"
+      ? "Bạn nộp được đề cương sau khi giảng viên xác nhận hồ sơ."
+      : pending
+        ? "Đề cương đang chờ giảng viên duyệt."
+        : "Đề cương không cần nộp thêm ở trạng thái hiện tại.";
 
   function toggle(code: string) {
     setCodes((current) => (current.includes(code) ? current.filter((c) => c !== code) : [...current, code]));
@@ -33,36 +40,25 @@ function Content({ detail, reload }: { detail: InternshipDetail; reload: () => v
 
   return (
     <>
-      {canSubmit ? (
-        <Card title={detail.outlines.length ? "Nộp phiên bản mới" : "Nộp đề cương"}>
-          <Field label="Nội dung đề cương (mục tiêu, nhiệm vụ, kế hoạch, kết quả dự kiến)" hint="Tối thiểu 50 ký tự. Nội dung đã nộp không sửa tại chỗ; sửa = nộp phiên bản mới.">
-            <textarea value={content} onChange={(e) => setContent(e.target.value)} style={{ minHeight: "12rem" }} />
-          </Field>
-          <p>
-            <strong>Đối chiếu chuẩn đầu ra của khóa {row.cohort}:</strong>
-          </p>
-          {outcomes.length === 0 && <Empty>Quản trị viên chưa khai báo chuẩn đầu ra cho khóa này.</Empty>}
-          {outcomes.map((o) => (
-            <label key={o.id} style={{ display: "block", marginBottom: "0.25rem" }}>
-              <input type="checkbox" checked={codes.includes(o.code)} onChange={() => toggle(o.code)} /> <strong>{o.code}</strong> — {o.description}
-            </label>
-          ))}
-          <ErrorText message={submit.error} />
-          <Button variant="primary" disabled={submit.busy || content.trim().length < 50} onClick={() => void submit.run(() => send("POST", "/api/student/outlines", { content, outcome_codes: codes }))}>
-            Nộp đề cương
-          </Button>
-        </Card>
-      ) : (
-        <Card>
-          <p>
-            {row.status === "draft" || row.status === "submitted" || row.status === "revision_requested"
-              ? "Bạn nộp được đề cương sau khi giảng viên xác nhận hồ sơ."
-              : pending
-                ? "Đề cương đang chờ giảng viên duyệt."
-                : "Đề cương không cần nộp thêm ở trạng thái hiện tại."}
-          </p>
-        </Card>
-      )}
+      <Card title={detail.outlines.length ? "Nộp phiên bản mới" : "Nộp đề cương"}>
+        {!canSubmit && <p className="mt-0 rounded-lg border-2 border-foreground/25 bg-background px-3 py-2 text-sm">{blockedReason}</p>}
+        <Field label="Nội dung đề cương (mục tiêu, nhiệm vụ, kế hoạch, kết quả dự kiến)" required hint="Tối thiểu 50 ký tự. Nội dung đã nộp không sửa tại chỗ; sửa = nộp phiên bản mới.">
+          <textarea value={content} disabled={!canSubmit} onChange={(e) => setContent(e.target.value)} style={{ minHeight: "12rem" }} />
+        </Field>
+        <p>
+          <strong>Đối chiếu chuẩn đầu ra của khóa {row.cohort}:</strong>
+        </p>
+        {outcomes.length === 0 && <Empty>Quản trị viên chưa khai báo chuẩn đầu ra cho khóa này.</Empty>}
+        {outcomes.map((o) => (
+          <label key={o.id} style={{ display: "block", marginBottom: "0.25rem" }}>
+            <input type="checkbox" disabled={!canSubmit} checked={codes.includes(o.code)} onChange={() => toggle(o.code)} /> <strong>{o.code}</strong> — {o.description}
+          </label>
+        ))}
+        <ErrorText message={submit.error} />
+        <Button variant="primary" disabled={!canSubmit || submit.busy || content.trim().length < 50} onClick={() => void submit.run(() => send("POST", "/api/student/outlines", { content, outcome_codes: codes }))}>
+          Nộp đề cương
+        </Button>
+      </Card>
 
       <Card title="Các phiên bản đã nộp">
         {detail.outlines.length === 0 && <Empty>Chưa nộp đề cương.</Empty>}

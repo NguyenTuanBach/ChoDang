@@ -348,6 +348,17 @@ function JournalBlock({ j, isLecturer, reload }: { j: InternshipDetail["journals
     <div style={{ marginBottom: "1rem" }}>
       <strong>Tuần bắt đầu {fmtDate(j.week_start)}</strong>
       <Pre>{j.content}</Pre>
+      {(j.plan_items ?? []).length > 0 && (
+        <ul style={{ margin: "0.25rem 0", paddingLeft: "1.25rem" }}>
+          {j.plan_items.map((it, i) => (
+            <li key={`${i}-${it.text}`}>
+              {it.done ? "✓" : "○"} {it.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {j.blockers && <p>Đang vướng: {j.blockers}</p>}
+      {j.ai_advice && <p>Gợi ý lịch từ AI (sinh viên tự hỏi): {j.ai_advice}</p>}
       {j.lecturer_comment && <p>Nhận xét: {j.lecturer_comment}</p>}
       {isLecturer && (
         <>

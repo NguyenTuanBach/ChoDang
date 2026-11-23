@@ -40,6 +40,11 @@ def register_exception_handlers(app: FastAPI) -> None:
     for exc_type, (status, code) in _STATUS.items():
         app.add_exception_handler(exc_type, make(status, code))
 
+    @app.exception_handler(FileNotFoundError)
+    async def missing_file(_request: Request, _error: FileNotFoundError) -> JSONResponse:
+        # Bản ghi còn nhưng tệp không có trong kho (vd đổi từ lưu cục bộ sang R2): báo 404, không lộ khóa lưu trữ.
+        return JSONResponse(status_code=404, content={"error": "not_found", "message": "Tệp không còn trong kho lưu trữ"})
+
     @app.exception_handler(Exception)
     async def unexpected(_request: Request, error: Exception) -> JSONResponse:
         # Không lộ chi tiết nội bộ cho client.

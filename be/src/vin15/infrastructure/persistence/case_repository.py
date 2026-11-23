@@ -297,17 +297,27 @@ class CaseRepository:
     def journals(self, internship_id: int) -> list[dict]:
         with self._db.connection() as conn:
             return conn.execute(
-                "select id, internship_id, week_start, content, submitted_at, lecturer_comment, commented_at from journal_entry "
+                "select id, internship_id, week_start, content, plan_items, blockers, ai_advice, submitted_at, lecturer_comment, commented_at from journal_entry "
                 "where internship_id = %s order by week_start desc",
                 (internship_id,),
             ).fetchall()
 
-    def add_journal(self, internship_id: int, week_start: date, content: str, audit: AuditEntry) -> int:
+    def add_journal(
+        self,
+        internship_id: int,
+        week_start: date,
+        content: str,
+        audit: AuditEntry,
+        *,
+        plan_items: list[dict] | None = None,
+        blockers: str = "",
+        ai_advice: str = "",
+    ) -> int:
         with self._db.connection() as conn:
             row = conn.execute(
-                "insert into journal_entry (internship_id, week_start, content) values (%s, %s, %s) "
+                "insert into journal_entry (internship_id, week_start, content, plan_items, blockers, ai_advice) values (%s, %s, %s, %s, %s, %s) "
                 "on conflict (internship_id, week_start) do nothing returning id",
-                (internship_id, week_start, content),
+                (internship_id, week_start, content, Jsonb(plan_items or []), blockers, ai_advice),
             ).fetchone()
             if row is None:
                 raise StateConflictError("Tuần này đã có nhật ký (nội dung đã nộp không sửa tại chỗ)")
@@ -321,6 +331,12 @@ class CaseRepository:
                 "where j.id = %s",
                 (journal_id,),
             ).fetchone()
+
+    def set_journal_items(self, journal_id: int, plan_items: list[dict], audit: AuditEntry) -> None:
+        """Cập nhật danh sách việc của nhật ký (chủ yếu để tích hoàn thành sau khi nộp); nội dung đã nộp không đổi."""
+        with self._db.connection() as conn:
+            conn.execute("update journal_entry set plan_items = %s where id = %s", (Jsonb(plan_items), journal_id))
+            insert_audit(conn, _entity(audit, journal_id))
 
     def comment_journal(self, journal_id: int, comment: str, audit: AuditEntry) -> None:
         with self._db.connection() as conn:

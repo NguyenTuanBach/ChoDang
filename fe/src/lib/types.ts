@@ -49,10 +49,17 @@ export type Outline = {
   submitted_at: string;
 };
 
+/** Một việc trong nhật ký tuần; `done` = đã hoàn thành (chưa xong thì chuyển sang tuần sau). */
+export type PlanItem = { text: string; done: boolean };
+
 export type Journal = {
   id: number;
   week_start: string;
   content: string;
+  plan_items: PlanItem[];
+  blockers: string;
+  /** Gợi ý lịch do AI (rỗng nếu sinh viên không hỏi). */
+  ai_advice: string;
   submitted_at: string;
   lecturer_comment: string;
 };

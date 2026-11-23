@@ -50,6 +50,7 @@ from vin15.service.jobs.scheduler import JobRunner
 from vin15.service.lms.lms_admin_service import LmsAdminService
 from vin15.service.lms.lms_port import LmsPort
 from vin15.service.lms.lms_sync_service import LmsSyncService
+from vin15.service.milestone.journal_advice_service import JournalAdviceService
 from vin15.service.milestone.milestone_service import MilestoneService
 from vin15.service.monitoring.monitoring_service import MonitoringService
 from vin15.service.monitoring.pre_review_service import PreReviewService
@@ -325,6 +326,10 @@ class Container:
             max_per_milestone=s.reminder_max_per_milestone,
             outcomes_of=self.config_repository.learning_outcomes,
         )
+
+    @cached_property
+    def journal_advice_service(self) -> JournalAdviceService:
+        return JournalAdviceService(self.case_repository, self.agent_client, self.pii_redactor, self.clock)
 
     @cached_property
     def pre_review_service(self) -> PreReviewService:

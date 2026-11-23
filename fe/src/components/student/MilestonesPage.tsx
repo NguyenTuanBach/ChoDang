@@ -1,14 +1,13 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, FileText } from "lucide-react";
 import { useState } from "react";
 import { send, upload } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
-import { fmtDate } from "@/lib/labels";
+import { fmtDate, fmtDateTime } from "@/lib/labels";
 import type { InternshipDetail, Milestone } from "@/lib/types";
-import { Async, Button, Card, Empty, ErrorText, Field, FilePicker, Page, Row, StatusBadge } from "@/components/ui/ui";
+import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, Page, Row, StatusBadge } from "@/components/ui/ui";
 import { cn } from "@/lib/utils";
-import DownloadDoc from "./DownloadDoc";
 
 // Các mốc bắt buộc dạng dòng thời gian dọc: mốc xong có dấu tích xanh, mốc tiếp theo nổi bật, mốc quá hạn viền đỏ.
 export default function MilestonesPage() {
@@ -44,7 +43,8 @@ function dueText(m: Milestone): string {
 }
 
 function MilestoneStep({ index, last, current, milestone: m, detail, reload }: { index: number; last: boolean; current: boolean; milestone: Milestone; detail: InternshipDetail; reload: () => void }) {
-  const evidence = detail.evidence.filter((e) => e.milestone_code === m.code);
+  // Các lần nộp minh chứng của mốc, theo thứ tự thời gian: Lần 1, Lần 2...
+  const evidence = detail.evidence.filter((e) => e.milestone_code === m.code).sort((a, b) => a.submitted_at.localeCompare(b.submitted_at) || a.id - b.id);
   const working = ["in_progress", "pending_credit"].includes(detail.internship?.status ?? "");
   const locked = m.stored_status === "submitted" || m.stored_status === "accepted";
   const done = m.stored_status === "accepted";
@@ -60,7 +60,7 @@ function MilestoneStep({ index, last, current, milestone: m, detail, reload }: {
         className={cn(
           "relative z-10 flex size-10 items-center justify-center rounded-full border-2 text-sm font-semibold",
           done && "border-green-600 bg-green-600 text-white",
-          !done && current && "border-foreground bg-foreground text-background ring-4 ring-beige-strong",
+          !done && current && "border-beige-strong bg-card text-foreground ring-4 ring-beige-strong/40",
           !done && !current && overdue && "border-red-600 bg-background text-red-600",
           !done && !current && !overdue && "border-foreground/25 bg-background text-muted-foreground",
         )}
@@ -89,14 +89,34 @@ function MilestoneStep({ index, last, current, milestone: m, detail, reload }: {
         {(evidence.length > 0 || m.submittable) && (
           <div className="mt-3 space-y-2 text-sm">
             {evidence.length === 0 && <p className="m-0 text-muted-foreground">Chưa có minh chứng.</p>}
-            {evidence.map((e) => (
-              <div key={e.id} className="flex flex-wrap items-center gap-2">
-                <span className="text-muted-foreground">Đã tải:</span>
-                {e.filename ? <DownloadDoc href={`/api/evidence/${e.id}/download`} name={e.title || e.filename} /> : <span>{e.title}</span>}
-                <StatusBadge kind="milestone" value={e.status} />
-                {e.reviewer_comment && <span className="text-muted-foreground">— {e.reviewer_comment}</span>}
-              </div>
-            ))}
+            {evidence.map((e, i) => {
+              const failed = e.status === "rejected";
+              return (
+                <div key={e.id} className="rounded-lg border border-foreground/15 bg-background px-3 py-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold">{i + 1}</span>
+                      {e.filename ? (
+                        <a href={`/api/evidence/${e.id}/download`} download className="inline-flex items-center gap-1.5 font-medium text-foreground no-underline hover:underline">
+                          <FileText aria-hidden className="size-4 text-muted-foreground" />
+                          Lần {i + 1}
+                        </a>
+                      ) : (
+                        <span className="font-medium">Lần {i + 1}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground">{fmtDateTime(e.submitted_at)}</span>
+                    </div>
+                    {failed ? <Badge tone="bad">Thất bại</Badge> : <StatusBadge kind="milestone" value={e.status} />}
+                  </div>
+                  {e.reviewer_comment && (
+                    <p className={cn("m-0 mt-2 rounded-md px-2.5 py-1.5 text-xs", failed ? "bg-danger-soft text-destructive" : "bg-muted text-muted-foreground")}>
+                      {failed ? "Lý do: " : "Nhận xét: "}
+                      {e.reviewer_comment}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         <ErrorText message={up.error ?? submit.error} />

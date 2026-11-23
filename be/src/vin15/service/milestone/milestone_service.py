@@ -21,6 +21,20 @@ from vin15.service.progress.progress_calculator import EVIDENCE_REQUIRED_CODES
 #: Mốc sinh viên nộp. M1 (hồ sơ) và M2 (đề cương) đạt qua quyết định của giảng viên ở bước hồ sơ/đề cương.
 SUBMITTABLE = ("M3", "M4", "M5")
 _WORKING = ("in_progress", "pending_credit")
+MAX_PLAN_ITEMS = 20
+MAX_ITEM_CHARS = 300
+
+
+def normalize_plan_items(items: list[dict] | None) -> list[dict]:
+    """Danh sách việc ``[{"text", "done"}]``: bỏ dòng trống, cắt độ dài, giới hạn số dòng."""
+    cleaned: list[dict] = []
+    for item in items or []:
+        text = str(item.get("text", "")).strip()
+        if text:
+            cleaned.append({"text": text[:MAX_ITEM_CHARS], "done": bool(item.get("done", False))})
+    if len(cleaned) > MAX_PLAN_ITEMS:
+        raise InvalidInputError(f"Tối đa {MAX_PLAN_ITEMS} việc trong kế hoạch")
+    return cleaned
 
 
 class MilestoneService:
@@ -100,7 +114,15 @@ class MilestoneService:
         require_view_internship(viewer, ev["owner_id"], ev["lecturer_id"])
         return self._storage.get(ev["storage_key"]), ev["mime"], ev["filename"]
 
-    def submit_journal(self, student: User, week_start: date, content: str) -> int:
+    def submit_journal(
+        self,
+        student: User,
+        week_start: date,
+        content: str,
+        plan_items: list[dict] | None = None,
+        blockers: str = "",
+        ai_advice: str = "",
+    ) -> int:
         row = self._cases.student_internship(student.id)
         if row is None or row["status"] != "in_progress":
             raise StateConflictError("Chỉ nộp nhật ký khi đang thực tập")
@@ -114,6 +136,22 @@ class MilestoneService:
             row["id"], first, content.strip(),
             AuditEntry(actor_kind=ActorKind.HUMAN, actor_id=student.id, actor_role=student.role.value, entity="journal", action="submit",
                        after={"week_start": first.isoformat()}, reason="Nộp nhật ký tuần"),
+            plan_items=normalize_plan_items(plan_items),
+            blockers=blockers.strip()[:2000],
+            ai_advice=ai_advice.strip()[:3000],
+        )
+
+    def update_journal_items(self, student: User, journal_id: int, plan_items: list[dict]) -> None:
+        """Sinh viên tích/bỏ tích việc trong nhật ký của mình (kể cả sau khi nộp); nội dung đã nộp không đổi."""
+        j = self._cases.get_journal(journal_id)
+        if j is None:
+            raise ResourceNotFoundError("Không tìm thấy nhật ký")
+        if j["owner_id"] != student.id:
+            raise ScopeDeniedError("Chỉ sinh viên sở hữu nhật ký được cập nhật danh sách việc")
+        self._cases.set_journal_items(
+            journal_id, normalize_plan_items(plan_items),
+            AuditEntry(actor_kind=ActorKind.HUMAN, actor_id=student.id, actor_role=student.role.value, entity="journal", action="update_items",
+                       reason="Cập nhật việc hoàn thành"),
         )
 
     # ---- Giảng viên ----

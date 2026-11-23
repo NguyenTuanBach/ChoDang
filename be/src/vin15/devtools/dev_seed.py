@@ -33,6 +33,7 @@ LECTURER_EMAIL = "gv@example.test"
 STUDENT_A_EMAIL = "sv.a@example.test"
 STUDENT_B_EMAIL = "sv.b@example.test"
 STUDENT_C_EMAIL = "sv.c@example.test"
+STUDENT_D_EMAIL = "sv.d@example.test"
 COHORT = "2026-K1"
 
 _FRONT_MATTER = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
@@ -109,12 +110,14 @@ def _seed_people(database: Database, today: date, report: SeedReport) -> None:
         student_a = _user(conn, STUDENT_A_EMAIL, "Sinh viên A (mẫu)", "student", lecturer, "SV0001", lecturer)
         student_b = _user(conn, STUDENT_B_EMAIL, "Sinh viên B (mẫu)", "student", lecturer, "SV0002", lecturer)
         _user(conn, STUDENT_C_EMAIL, "Sinh viên C (mẫu, chưa có hồ sơ)", "student", lecturer, "SV0003", lecturer)
-        report.users = 5
+        student_d = _user(conn, STUDENT_D_EMAIL, "Sinh viên D (mẫu, chờ nộp đề cương)", "student", lecturer, "SV0004", lecturer)
+        report.users = 6
         _seed_outcomes(conn)
         _seed_student_a(conn, student_a, lecturer, today)
         _seed_student_b(conn, student_b, lecturer, today)
+        _seed_student_d(conn, student_d, lecturer, today)
         _seed_lms(conn)
-        report.internships = 2
+        report.internships = 3
 
 
 def _user(conn, email: str, name: str, role: str, invited_by: int | None, student_code: str | None = None, advisor_id: int | None = None) -> int:
@@ -280,6 +283,24 @@ def _seed_student_b(conn, user_id: int, lecturer_id: int, today: date) -> None:
     _outline(conn, internship, "approved")
     _evidence(conn, milestones["M3"], "Báo cáo giữa kỳ", "accepted")
     _evidence(conn, milestones["M4"], "Báo cáo cuối kỳ", "submitted")
+
+
+def _seed_student_d(conn, user_id: int, lecturer_id: int, today: date) -> None:
+    """SV D: hồ sơ vừa được giảng viên xác nhận, chưa nộp đề cương (để thử form nộp đề cương); các mốc còn lại chưa tới hạn."""
+    start = today + timedelta(days=14)
+    end = start + timedelta(days=83)
+    internship = _internship(conn, user_id, lecturer_id, "confirmed", start, end, "onsite")
+    _milestones(
+        conn,
+        internship,
+        [
+            ("M1", _M["M1"], today - timedelta(days=1), "accepted"),
+            ("M2", _M["M2"], start + timedelta(days=14), "pending"),
+            ("M3", _M["M3"], start + timedelta(days=42), "pending"),
+            ("M4", _M["M4"], end - timedelta(days=7), "pending"),
+            ("M5", _M["M5"], end + timedelta(days=7), "pending"),
+        ],
+    )
 
 
 # ---------------------------------------------------------------- quy chế mẫu ----

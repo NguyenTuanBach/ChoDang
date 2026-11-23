@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from tests.conftest import make_settings
 from tests.fakes import TODAY
 from vin15.config.container import Container
-from vin15.devtools.dev_seed import STUDENT_A_EMAIL, STUDENT_B_EMAIL, STUDENT_C_EMAIL, SeedRefusedError, read_policy_files, run_seed
+from vin15.devtools.dev_seed import STUDENT_A_EMAIL, STUDENT_B_EMAIL, STUDENT_C_EMAIL, STUDENT_D_EMAIL, SeedRefusedError, read_policy_files, run_seed
 from vin15.main import create_app
 
 SERVICE = {"Authorization": "Bearer svc-token"}
@@ -65,7 +65,7 @@ def tool(container, email: str | None = None):
 # ---- Seed ----
 def test_seed_creates_expected_people_policies_and_publishes(seeded):
     container, report = seeded
-    assert report.users == 5 and report.internships == 2 and report.policy_versions == 3 and report.policy_published_now == 3
+    assert report.users == 6 and report.internships == 3 and report.policy_versions == 3 and report.policy_published_now == 3
     with container.database.connection() as conn:
         roles = {r["email"]: r["role"] for r in conn.execute("select email, role from app_user")}
         versions = {
@@ -80,6 +80,7 @@ def test_seed_creates_expected_people_policies_and_publishes(seeded):
         STUDENT_A_EMAIL: "student",
         STUDENT_B_EMAIL: "student",
         STUDENT_C_EMAIL: "student",
+        STUDENT_D_EMAIL: "student",
     }
     assert all(v["is_sample"] for v in versions.values())
     assert versions[("QD-TC-02", "v1")]["status"] == "superseded" and versions[("QD-TC-02", "v1")]["effective_to"] == date(2025, 12, 31)

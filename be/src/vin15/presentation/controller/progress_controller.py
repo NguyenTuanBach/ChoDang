@@ -6,7 +6,15 @@ from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
 from vin15.config.container import Container
 from vin15.domain.model.user import User
-from vin15.presentation.dto.workflow import CommentBody, JournalBody, OutlineBody, OutlineDecisionBody, ReasonBody
+from vin15.presentation.dto.workflow import (
+    CommentBody,
+    JournalAdviceBody,
+    JournalBody,
+    JournalItemsBody,
+    OutlineBody,
+    OutlineDecisionBody,
+    ReasonBody,
+)
 
 from .dependencies import container, current_user, lecturer_user, student_user
 from .internship_controller import file_response, read_upload
@@ -60,7 +68,18 @@ def download_evidence(evidence_id: int, user: User = Depends(current_user), app:
 # ---- Nhật ký ----
 @router.post("/api/student/journal", status_code=201, summary="Nộp nhật ký tuần")
 def submit_journal(body: JournalBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
-    return {"id": app.milestone_service.submit_journal(student, body.week_start, body.content)}
+    items = [i.model_dump() for i in body.plan_items]
+    return {"id": app.milestone_service.submit_journal(student, body.week_start, body.content, items, body.blockers, body.ai_advice)}
+
+
+@router.put("/api/student/journal/{journal_id}/items", status_code=204, summary="Sinh viên tích việc đã hoàn thành trong nhật ký")
+def update_journal_items(journal_id: int, body: JournalItemsBody, student: User = Depends(student_user), app: Container = Depends(container)) -> None:
+    app.milestone_service.update_journal_items(student, journal_id, [i.model_dump() for i in body.plan_items])
+
+
+@router.post("/api/student/journal/ai-advice", summary="Hỏi AI xem lịch tuần tới đã ổn chưa (gợi ý, không thay quyết định)")
+async def journal_ai_advice(body: JournalAdviceBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    return await app.journal_advice_service.advise(student, body.content, [i.model_dump() for i in body.plan_items], body.blockers)
 
 
 @router.post("/api/journal/{journal_id}/comment", status_code=204, summary="GV nhận xét nhật ký")

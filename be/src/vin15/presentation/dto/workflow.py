@@ -64,9 +64,28 @@ class OutlineDecisionBody(BaseModel):
     reason: str = Field(default="", max_length=2000)
 
 
+class PlanItemBody(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+    done: bool = False
+
+
 class JournalBody(BaseModel):
     week_start: date
     content: str = Field(min_length=1, max_length=10000)
+    plan_items: list[PlanItemBody] = Field(default_factory=list, max_length=20)
+    blockers: str = Field(default="", max_length=2000)
+    #: Gợi ý lịch do AI (lấy từ ``/api/student/journal/ai-advice``); để trống nếu sinh viên không hỏi.
+    ai_advice: str = Field(default="", max_length=3000)
+
+
+class JournalItemsBody(BaseModel):
+    plan_items: list[PlanItemBody] = Field(max_length=20)
+
+
+class JournalAdviceBody(BaseModel):
+    content: str = Field(default="", max_length=10000)
+    plan_items: list[PlanItemBody] = Field(default_factory=list, max_length=20)
+    blockers: str = Field(default="", max_length=2000)
 
 
 class CommentBody(BaseModel):

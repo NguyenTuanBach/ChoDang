@@ -17,7 +17,7 @@ def test_info_requires_token(client):
 def test_info_with_token(client):
     body = client.get("/v1/info", headers={"Authorization": "Bearer tok"}).json()
     assert body["service"] == "vin15-agent-api"
-    assert body["agents"] == ["policy_assistant", "intake", "monitor", "pre_review"]
+    assert body["agents"] == ["policy_assistant", "intake", "monitor", "pre_review", "journal_advice"]
 
 
 def test_production_rejects_default_token():
