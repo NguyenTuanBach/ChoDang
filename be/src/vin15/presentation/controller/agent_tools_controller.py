@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
@@ -132,12 +132,13 @@ def staff_dashboard(
     return StaffDashboardResponse.model_validate(app.agent_tool_service.staff_dashboard(subject, cohort))
 
 
-@router.get("/staff/internships", response_model=StaffInternshipsResponse, summary="Danh sách hồ sơ trong phạm vi (lọc trạng thái/quá hạn)")
+@router.get("/staff/internships", response_model=StaffInternshipsResponse, summary="Danh sách hồ sơ trong phạm vi (lọc trạng thái/quá hạn/sinh viên)")
 def staff_internships(
     status: str | None = None,
     overdue_only: bool = False,
     cohort: str | None = None,
+    student: str | None = Query(default=None, max_length=100, description="Tên (không dấu cũng được) hoặc mã sinh viên"),
     subject: AgentToolSubject = Depends(agent_subject),
     app: Container = Depends(container),
 ) -> StaffInternshipsResponse:
-    return StaffInternshipsResponse.model_validate(app.agent_tool_service.staff_internships(subject, status, overdue_only, cohort))
+    return StaffInternshipsResponse.model_validate(app.agent_tool_service.staff_internships(subject, status, overdue_only, cohort, student))

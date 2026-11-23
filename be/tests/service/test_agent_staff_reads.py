@@ -80,6 +80,27 @@ def test_internships_overdue_filter_and_no_contact_fields(reads):
     assert result.total == 1 and result.items[0].id == 1 and not hasattr(result.items[0], "student_email")
 
 
+@pytest.mark.parametrize(
+    ("query", "ids"),
+    [
+        ("Nguyễn Văn An", [1]), ("nguyen van an", [1]), ("nguyen an", [1]), ("  TRẦN  ", [2]), ("đức", [3]), ("sv2026002", [2]),
+        ("an", [1]),  # đầu từ: không khớp "Trần" (tran), "Toàn" (toan)
+        ("Lê", []),
+    ],  # fmt: skip
+)
+def test_internships_filter_by_student_name_or_code(reads, query, ids):
+    service, reports = reads
+    base = {"cohort": "K2026", "status": "in_progress", "company_name": "Cty", "start_date": None, "end_date": None, "overdue_milestones": 0, "submitted_milestones": 0, "open_flags": 0}
+    rows = [
+        {**base, "id": 1, "student_name": "Nguyễn Văn An", "student_code": "SV2026001"},
+        {**base, "id": 2, "student_name": "Trần Thị Bình", "student_code": "SV2026002"},
+        {**base, "id": 3, "student_name": "Phạm Đức Toàn", "student_code": None},
+    ]
+    reports.list_internships = lambda user, **_: rows
+    result = service.internships(subject(LECTURER), None, False, None, query)
+    assert [i.id for i in result.items] == ids and result.total == len(ids)
+
+
 def test_flags_drop_internal_fields(reads):
     service, _ = reads
     item = service.flags(subject(LECTURER), "open").items[0]

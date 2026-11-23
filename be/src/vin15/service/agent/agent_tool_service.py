@@ -96,9 +96,13 @@ class AgentToolService:
     def staff_dashboard(self, subject: AgentToolSubject, cohort: str | None) -> DashboardResult:
         return self._run(subject, "get_dashboard_summary", {"cohort": cohort}, lambda: self._staff_factory().dashboard(subject, cohort), staff_only=True)
 
-    def staff_internships(self, subject: AgentToolSubject, status: str | None, overdue_only: bool, cohort: str | None) -> InternshipsResult:
-        params = {"status": status, "overdue_only": overdue_only, "cohort": cohort}
-        return self._run(subject, "list_internships", params, lambda: self._staff_factory().internships(subject, status, overdue_only, cohort), staff_only=True)
+    def staff_internships(
+        self, subject: AgentToolSubject, status: str | None, overdue_only: bool, cohort: str | None, student: str | None = None
+    ) -> InternshipsResult:
+        params = {"status": status, "overdue_only": overdue_only, "cohort": cohort, "student": student}
+        return self._run(
+            subject, "list_internships", params, lambda: self._staff_factory().internships(subject, status, overdue_only, cohort, student), staff_only=True
+        )
 
     # ---- Chung ----
     def _run(

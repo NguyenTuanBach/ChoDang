@@ -23,6 +23,13 @@ class Actor(BaseModel):
     agent_token: str = ""
 
 
+class CurrentPage(BaseModel):
+    """Trang người dùng đang mở khi hỏi (khóa trong ``pages.json``; ``internship_id`` khi đang xem chi tiết hồ sơ). Chỉ là ngữ cảnh."""
+
+    key: str = Field(pattern=r"^[a-z_]{1,40}$")
+    internship_id: int | None = Field(default=None, gt=0)
+
+
 class StartFrame(BaseModel):
     type: Literal["start"] = "start"
     conversation_id: str
@@ -31,6 +38,7 @@ class StartFrame(BaseModel):
     history: list[HistoryItem] = Field(default_factory=list)
     actor: Actor
     today: str  # YYYY-MM-DD, theo múi giờ nghiệp vụ
+    current_page: CurrentPage | None = None
 
 
 class CancelFrame(BaseModel):
@@ -93,11 +101,14 @@ class Usage(BaseModel):
 
 
 class Action(BaseModel):
-    """Hành động giao diện trợ lý đề nghị (hiện chỉ điều hướng). ``page`` là khóa trang trong ``pages.json``; FE tự đổi sang URL."""
+    """Hành động giao diện trợ lý đề nghị (hiện chỉ điều hướng). ``page`` là khóa trang trong ``pages.json``; FE tự đổi sang URL
+    (kèm ``internship_id`` cho trang chi tiết hồ sơ và ``filters`` thành query string)."""
 
     type: Literal["navigate"] = "navigate"
     page: str
     label: str
+    internship_id: int | None = None
+    filters: dict[str, str] = Field(default_factory=dict)
 
 
 class FinalFrame(BaseModel):

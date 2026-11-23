@@ -26,10 +26,19 @@ export interface Citation {
 
 // Hành động giao diện do trợ lý đề nghị (hiện chỉ có điều hướng). `page` là khóa trang (lib/nav.ts), FE tự đổi sang URL
 // theo vai trò và bỏ qua khóa lạ. Chỉ có trong `final` của lượt đang chạy, không được lưu trong lịch sử hội thoại.
+// `internship_id` cho trang chi tiết hồ sơ; `filters` thành query string (lib/nav.ts chỉ giữ khóa trang khai báo).
 export interface AssistantAction {
   type: "navigate";
   page: string;
   label: string;
+  internship_id?: number | null;
+  filters?: Record<string, string> | null;
+}
+
+// Trang người dùng đang mở khi hỏi (ngữ cảnh cho "trang này"); BE bỏ qua nếu sai định dạng.
+export interface CurrentPageRef {
+  key: string;
+  internship_id?: number;
 }
 
 export interface Usage {
@@ -42,7 +51,7 @@ export interface Usage {
 // FE -> BE
 export type ClientFrame =
   | { type: "auth"; ticket: string }
-  | { type: "ask"; conversation_id: string | null; turn_id: string; question: string }
+  | { type: "ask"; conversation_id: string | null; turn_id: string; question: string; page?: CurrentPageRef | null }
   | { type: "cancel"; turn_id: string }
   | { type: "ping" };
 

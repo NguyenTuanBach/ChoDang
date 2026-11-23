@@ -102,6 +102,25 @@ async def test_start_frame_has_scoped_short_lived_agent_token_and_today():
     assert claims["exp"] - time.time() <= 5 * 60 + 2
     with pytest.raises(AuthenticationRequiredError):
         TOKENS.decode(start["actor"]["agent_token"])  # không dùng được như token phiên thường
+    assert "current_page" not in start  # FE không gửi trang thì không có
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("page", "expected"),
+    [
+        ({"key": "internship_detail", "internship_id": 12}, {"key": "internship_detail", "internship_id": 12}),
+        ({"key": "outline", "internship_id": "12"}, {"key": "outline"}),  # mã sai kiểu bị bỏ
+        ({"key": "../admin"}, None),
+        ("outline", None),
+    ],
+)
+async def test_start_frame_forwards_only_valid_current_page(page, expected):
+    record = []
+    async with fake_agent(script(FINAL, record=record)) as url:
+        orchestrator, _chats, _audit = make(url)
+        await orchestrator.run_turn(STUDENT_A, None, "t1", "trang này để làm gì?", Sink(), current_page=page)
+    assert record[0].get("current_page") == expected
 
 
 @pytest.mark.anyio
@@ -256,6 +275,24 @@ async def test_duplicate_turn_id_is_rejected():
         (
             [{"type": "navigate", "page": "../x", "label": "bad"}, {"type": "navigate", "page": "journal", "label": "Nhật ký"}, {"type": "navigate", "page": "grades", "label": "Bảng điểm"}],
             [{"type": "navigate", "page": "journal", "label": "Nhật ký"}],
+        ),
+        # mã hồ sơ và bộ lọc: giữ khi đúng định dạng, sai thì bỏ riêng trường đó
+        (
+            [{"type": "navigate", "page": "internship_detail", "label": "Chi tiết hồ sơ", "internship_id": 7, "filters": None}],
+            [{"type": "navigate", "page": "internship_detail", "label": "Chi tiết hồ sơ", "internship_id": 7}],
+        ),
+        (
+            [{"type": "navigate", "page": "internship_detail", "label": "x", "internship_id": -1}, ],
+            [{"type": "navigate", "page": "internship_detail", "label": "x"}],
+        ),
+        ([{"type": "navigate", "page": "x", "label": "x", "internship_id": True}], [{"type": "navigate", "page": "x", "label": "x"}]),
+        (
+            [{"type": "navigate", "page": "internships", "label": "Hồ sơ", "filters": {"status": "in_progress", "milestone": "M2", "bad key": "x", "q": "<script>"}}],
+            [{"type": "navigate", "page": "internships", "label": "Hồ sơ", "filters": {"status": "in_progress", "milestone": "M2"}}],
+        ),
+        (
+            [{"type": "navigate", "page": "flags", "label": "x", "filters": {"a": "1", "b": "2", "c": "3", "d": "4", "e": "5"}}],
+            [{"type": "navigate", "page": "flags", "label": "x", "filters": {"a": "1", "b": "2", "c": "3", "d": "4"}}],
         ),
     ],
 )

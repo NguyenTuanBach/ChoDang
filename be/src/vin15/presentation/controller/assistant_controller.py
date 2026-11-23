@@ -260,7 +260,13 @@ async def _serve(websocket: WebSocket, app: Container, user: User) -> None:
                 conversation_id = frame.get("conversation_id")
                 turn = asyncio.create_task(
                     app.assistant_orchestrator.run_turn(
-                        user, None if conversation_id is None else str(conversation_id), turn_id, frame["question"], send, turn_cancel
+                        user,
+                        None if conversation_id is None else str(conversation_id),
+                        turn_id,
+                        frame["question"],
+                        send,
+                        turn_cancel,
+                        current_page=frame.get("page"),  # ngữ cảnh tùy chọn; orchestrator tự lọc định dạng
                     )
                 )
                 _background_turns.add(turn)

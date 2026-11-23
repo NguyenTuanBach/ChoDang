@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { query } from "@/lib/http";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, MILESTONE_STATUS, fmtDate } from "@/lib/labels";
@@ -10,12 +11,43 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Async, Badge, Card, DownloadButton, Empty, Field, Page, Row, StatusBadge, Table } from "@/components/ui/ui";
 
+type Props = { base: "/lecturer" | "/admin"; fixedStatus?: string; title?: string };
+type InitialFilters = { status: string; milestone: string; milestoneStatus: string; flagged: boolean };
+
+const MILESTONES = ["M1", "M2", "M3", "M4", "M5"];
+
 // Danh sách tổng hợp có lọc theo trạng thái, mốc, rủi ro; xuất CSV (A11).
-export default function InternshipList({ base, fixedStatus, title }: { base: "/lecturer" | "/admin"; fixedStatus?: string; title?: string }) {
-  const [status, setStatus] = useState(fixedStatus ?? "");
-  const [milestone, setMilestone] = useState("");
-  const [milestoneStatus, setMilestoneStatus] = useState("");
-  const [flagged, setFlagged] = useState(false);
+// Bộ lọc ban đầu lấy từ query (`?status=&milestone=&milestone_status=&flagged=true`, trợ lý mở trang kèm bộ lọc; khóa khai báo ở lib/nav.ts).
+// Giá trị lạ bị bỏ; query đổi thì dựng lại phần thân để nhận bộ lọc mới.
+export default function InternshipList(props: Props) {
+  return (
+    <Suspense fallback={null}>
+      <ListFromUrl {...props} />
+    </Suspense>
+  );
+}
+
+function ListFromUrl(props: Props) {
+  const params = useSearchParams();
+  const pick = (key: string, allowed: string[]) => {
+    const value = params.get(key) ?? "";
+    return allowed.includes(value) ? value : "";
+  };
+  const milestone = pick("milestone", MILESTONES);
+  const initial: InitialFilters = {
+    status: props.fixedStatus ?? pick("status", Object.keys(INTERNSHIP_STATUS)),
+    milestone,
+    milestoneStatus: milestone ? pick("milestone_status", Object.keys(MILESTONE_STATUS)) : "",
+    flagged: params.get("flagged") === "true",
+  };
+  return <ListView key={JSON.stringify(initial)} {...props} initial={initial} />;
+}
+
+function ListView({ base, fixedStatus, title, initial }: Props & { initial: InitialFilters }) {
+  const [status, setStatus] = useState(initial.status);
+  const [milestone, setMilestone] = useState(initial.milestone);
+  const [milestoneStatus, setMilestoneStatus] = useState(initial.milestoneStatus);
+  const [flagged, setFlagged] = useState(initial.flagged);
   const qs = query({ status, milestone_code: milestone, milestone_status: milestone ? milestoneStatus : "", flagged });
   const state = useApi<ListRow[]>(`/api/internships${qs}`);
 
@@ -38,7 +70,7 @@ export default function InternshipList({ base, fixedStatus, title }: { base: "/l
           <Field label="Mốc">
             <select value={milestone} onChange={(e) => setMilestone(e.target.value)}>
               <option value="">Tất cả</option>
-              {["M1", "M2", "M3", "M4", "M5"].map((m) => (
+              {MILESTONES.map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>

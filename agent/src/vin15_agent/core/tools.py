@@ -69,8 +69,11 @@ class TurnContext:
     tool_texts: list[str] = field(default_factory=list)
     redactor: PiiRedactor = field(default_factory=PiiRedactor)
     trace: TurnTrace = field(default_factory=TurnTrace)
-    #: Hành động giao diện mà tool yêu cầu trong lượt này (hiện chỉ ``{"type": "navigate", "page": khóa, "label": tên}``); vào ``final.actions``.
-    actions: list[dict[str, str]] = field(default_factory=list)
+    #: Hành động giao diện mà tool yêu cầu trong lượt này (hiện chỉ ``{"type": "navigate", "page": khóa, "label": tên,
+    #: "internship_id"?: số, "filters"?: {khóa: giá trị}}``); vào ``final.actions``.
+    actions: list[dict[str, Any]] = field(default_factory=list)
+    #: Mã hồ sơ đã thấy trong lượt này (kết quả tool dữ liệu hoặc trang đang mở). ``navigate_to`` chỉ mở hồ sơ có trong đây, tránh bịa mã.
+    seen_internship_ids: set[int] = field(default_factory=set)
     #: Tên các tool đọc dữ liệu của BE (hồ sơ, hàng chờ...; không phải tra quy định) trong registry của lượt này.
     data_tool_names: frozenset[str] = frozenset()
 

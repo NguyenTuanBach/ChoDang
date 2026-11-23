@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAssistant, type AssistantApi, type AssistantOptions } from "@/lib/assistant/useAssistant";
-import { pageHref } from "@/lib/nav";
+import { currentPageRef, pageHref } from "@/lib/nav";
 import { useCurrentUser } from "@/lib/user-context";
 
 const OPEN_KEY = "vin15.assistant.open";
@@ -36,10 +36,19 @@ function readOpen(): boolean {
 // Giữ MỘT phiên hội thoại (một WebSocket) cho cả khung ứng dụng: ngăn Trợ lý và trang /assistant dùng chung, chuyển trang không ngắt chat.
 // Cũng là nơi thực thi hành động điều hướng mà trợ lý đề nghị: mỗi lượt chỉ một lần, chỉ với lượt đang chạy (lịch sử tải lại không có `actions`),
 // và URL do FE tự suy ra từ khóa trang theo vai trò của người dùng (khóa lạ bị bỏ qua).
+// Mỗi câu hỏi gửi kèm trang đang mở (khóa + mã hồ sơ, không gửi URL) để trợ lý hiểu "trang này".
 export default function AssistantProvider({ children, options }: { children: ReactNode; options?: AssistantOptions }) {
   const router = useRouter();
+  const pathname = usePathname();
   const user = useCurrentUser();
-  const assistant = useAssistant(options);
+  const base = useAssistant(options);
+  const pathRef = useRef(pathname);
+  useEffect(() => {
+    pathRef.current = pathname;
+  }, [pathname]);
+  const baseAsk = base.ask;
+  const askWithPage = useCallback((question: string) => baseAsk(question, currentPageRef(user.role, pathRef.current ?? "")), [baseAsk, user.role]);
+  const assistant = useMemo<AssistantApi>(() => ({ ...base, ask: askWithPage }), [base, askWithPage]);
   // Provider chỉ dựng sau khi đã biết người dùng (phía trình duyệt), nên đọc localStorage ngay khi khởi tạo là an toàn.
   const [open, setOpenState] = useState(readOpen);
   const executed = useRef(new Set<string>());
@@ -69,7 +78,7 @@ export default function AssistantProvider({ children, options }: { children: Rea
       executed.current.add(turn.turnId);
       for (const action of turn.actions) {
         if (action.type !== "navigate") continue;
-        const target = pageHref(user.role, action.page);
+        const target = pageHref(user.role, action.page, { internshipId: action.internship_id, filters: action.filters });
         if (target) router.push(target.href);
       }
     }

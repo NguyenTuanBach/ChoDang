@@ -13,7 +13,7 @@ from fakes import CHUNKS, DURATION, JOURNAL, PERSONAL_DATA, FakeAi, FakeBe, repl
 from vin15_agent.core.ai_client import LlmUnavailableError
 from vin15_agent.policy_assistant.agent import PolicyAssistant, token_pieces
 from vin15_agent.policy_assistant.be_client import BeToolsClient
-from vin15_agent.policy_assistant.protocol import Actor, FinalFrame, HistoryItem, StartFrame
+from vin15_agent.policy_assistant.protocol import Actor, CurrentPage, FinalFrame, HistoryItem, StartFrame
 from vin15_agent.policy_assistant.verify import contains_commitment
 from vin15_agent.shared.settings import Settings
 
@@ -25,11 +25,14 @@ def settings(**kw):
     return Settings(_env_file=None, agent_api_service_token="tok", school_name="Trường Mẫu", **{"agent_turn_seconds": 5, **kw})
 
 
-def start(question="Thực tập tối thiểu bao lâu?", role="student", history=(), token=""):
-    return StartFrame(conversation_id="c1", turn_id="t1", question=question, history=list(history), actor=Actor(role=role, agent_token=token), today="2026-11-21")
+def start(question="Thực tập tối thiểu bao lâu?", role="student", history=(), token="", page=None):
+    return StartFrame(
+        conversation_id="c1", turn_id="t1", question=question, history=list(history), actor=Actor(role=role, agent_token=token), today="2026-11-21",
+        current_page=page,
+    )  # fmt: skip
 
 
-def run_turn(ai, be=None, *, role="student", question="Thực tập tối thiểu bao lâu?", history=(), cfg=None, token=""):
+def run_turn(ai, be=None, *, role="student", question="Thực tập tối thiểu bao lâu?", history=(), cfg=None, token="", page=None):
     be = be or FakeBe()
     frames = []
 
@@ -37,7 +40,7 @@ def run_turn(ai, be=None, *, role="student", question="Thực tập tối thiể
         frames.append(frame)
 
     assistant = PolicyAssistant(ai, lambda agent_token: BeToolsClient("http://be", "tok", agent_token, transport=be.transport()), cfg or settings())
-    asyncio.run(assistant.run(start(question, role, history, token), emit))
+    asyncio.run(assistant.run(start(question, role, history, token, page), emit))
     return frames, be
 
 
@@ -377,7 +380,8 @@ def test_student_gets_policy_nudge_but_staff_does_not():
 
 
 def _final_actions(frames):
-    return [a.model_dump() for a in final_of(frames).actions]
+    """Action trong final, bỏ trường tùy chọn rỗng (internship_id=None, filters={})."""
+    return [{k: v for k, v in a.model_dump().items() if v not in (None, {})} for a in final_of(frames).actions]
 
 
 def test_navigate_tool_puts_one_action_in_final_and_needs_no_backend_call():
@@ -423,3 +427,67 @@ def test_pages_json_keys_are_unique_per_role():
     for role in ("student", "lecturer", "admin"):
         keys = [p.key for p in pages_for(role)]
         assert len(keys) == len(set(keys)) and all(p.label and p.description for p in pages_for(role))
+
+
+# ---- navigate_to: trang chi tiết hồ sơ, bộ lọc, trang đang mở ----
+
+
+def _tool_msgs(ai, call=1):
+    return [m["content"] for m in ai.calls[call]["messages"] if m["role"] == "tool"]
+
+
+def test_navigate_to_internship_detail_needs_id_seen_in_this_turn():
+    ai = FakeAi(
+        reply("", [("a", "navigate_to", {"page": "internship_detail"}), ("b", "navigate_to", {"page": "internship_detail", "internship_id": 99})]),
+        reply("", [("c", "list_internships", {"student": "nguyen van a"})]),
+        reply("", [("d", "navigate_to", {"page": "internship_detail", "internship_id": 7})]),
+        reply("Đã mở hồ sơ của Nguyễn Văn A."),
+    )
+    frames, be = run_turn(ai, role="lecturer", question="mở hồ sơ của Nguyễn Văn A")
+    first = _tool_msgs(ai, 1)
+    assert "missing_internship_id" in first[0] and "unknown_internship" in first[1]  # thiếu mã / mã bịa
+    assert any("student=nguyen" in str(r.url) for r in be.requests)  # tham số student tới BE
+    assert _final_actions(frames) == [{"type": "navigate", "page": "internship_detail", "label": "Chi tiết hồ sơ", "internship_id": 7}]
+
+
+def test_navigate_with_filters_valid_and_invalid():
+    ai = FakeAi(
+        reply(
+            "",
+            [
+                ("a", "navigate_to", {"page": "queue", "filters": {"status": "open"}}),  # khóa của trang khác
+                ("b", "navigate_to", {"page": "flags", "filters": {"status": "bogus"}}),  # giá trị lạ
+                ("c", "navigate_to", {"page": "flags", "filters": {"status": "resolved"}}),
+            ],
+        ),
+        reply("Đã mở trang Cờ rủi ro, lọc đã giải quyết."),
+    )
+    frames, _ = run_turn(ai, role="lecturer", question="mở cờ rủi ro đã giải quyết")
+    msgs = _tool_msgs(ai)
+    assert "invalid_filter" in msgs[0] and "invalid_filter" in msgs[1] and '"opened"' in msgs[2]
+    assert _final_actions(frames) == [{"type": "navigate", "page": "flags", "label": "Cờ rủi ro", "filters": {"status": "resolved"}}]
+
+
+def test_navigate_schema_has_detail_page_and_filters_for_staff_only():
+    params = {}
+    for role in ("student", "lecturer"):
+        ai = FakeAi(reply("Xin chào."))
+        run_turn(ai, role=role, question="chào")
+        params[role] = next(t for t in ai.calls[0]["tools"] if t["function"]["name"] == "navigate_to")["function"]["parameters"]["properties"]
+    assert set(params["student"]) == {"page"}
+    assert "internship_detail" in params["lecturer"]["page"]["enum"] and "internship_id" in params["lecturer"]
+    assert {"kind", "status", "milestone", "milestone_status", "flagged"} <= set(params["lecturer"]["filters"]["properties"])
+
+
+def test_current_page_goes_into_prompt_and_its_internship_can_be_reopened():
+    ai = FakeAi(reply("", [("a", "navigate_to", {"page": "internship_detail", "internship_id": 12})]), reply("Đã mở lại hồ sơ."))
+    frames, _ = run_turn(ai, role="lecturer", question="mở lại hồ sơ này", page=CurrentPage(key="internship_detail", internship_id=12))
+    system = ai.calls[0]["messages"][0]["content"]
+    assert "đang mở trang: Chi tiết hồ sơ" in system and "hồ sơ mã 12" in system
+    assert _final_actions(frames)[0]["internship_id"] == 12
+
+
+def test_unknown_current_page_is_ignored_in_prompt():
+    ai = FakeAi(reply("Xin chào."))
+    run_turn(ai, question="chào", page=CurrentPage(key="audit"))  # trang của quản trị, sinh viên không có
+    assert "đang mở trang" not in ai.calls[0]["messages"][0]["content"]

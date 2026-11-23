@@ -2,7 +2,8 @@
 
 import { AlarmClock, Flag, Hourglass, Inbox, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Async, Badge, Button, Card, EmptyState, Page, StatCard, StatusBadge, outcomeBg } from "@/components/ui/ui";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, QUEUE_KIND, fmtDate, fmtDateTime } from "@/lib/labels";
@@ -63,12 +64,28 @@ function StatusDistribution({ rows }: { rows: { status: string; n: number }[] })
 
 // Trang chủ của giảng viên/quản trị viên: số liệu nhanh + hàng chờ duyệt xếp theo ưu tiên (hạn gần, rủi ro cao, chờ lâu) — A12.
 // Dải màu bên trái mỗi việc: đỏ = gấp, cam = nên xử lý sớm.
+// Bộ lọc ban đầu lấy từ `?kind=` (trợ lý mở hàng chờ kèm bộ lọc, khóa khai báo ở lib/nav.ts); giá trị lạ thì "Tất cả".
+// Query đổi (trợ lý lọc lại khi đang ở trang) thì dựng lại phần thân để nhận bộ lọc mới.
 export default function QueuePanel({ base }: { base: "/lecturer" | "/admin" }) {
+  return (
+    <Suspense fallback={null}>
+      <QueueFromUrl base={base} />
+    </Suspense>
+  );
+}
+
+function QueueFromUrl({ base }: { base: "/lecturer" | "/admin" }) {
+  const kind = useSearchParams().get("kind") ?? "";
+  const initial = FILTERS.some((f) => f.key === kind) ? kind : "all";
+  return <QueueView key={initial} base={base} initialFilter={initial} />;
+}
+
+function QueueView({ base, initialFilter }: { base: "/lecturer" | "/admin"; initialFilter: string }) {
   const user = useCurrentUser();
   const queue = useApi<QueueItem[]>("/api/queue");
   const dash = useApi<Dashboard>("/api/dashboard");
   const isAdmin = base === "/admin";
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(initialFilter);
   const firstName = user.full_name.replace(/\(.*?\)/g, "").trim() || user.email;
 
   const d = dash.data;

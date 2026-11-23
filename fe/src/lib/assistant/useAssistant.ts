@@ -4,7 +4,7 @@
 // Luồng: POST /api/assistant/ws-ticket → mở WS → gửi `auth{ticket}` → chờ `ready` → gửi `ask`.
 // Mất kết nối giữa lượt: nối lại có backoff, rồi tải lại hội thoại (BE chạy hết lượt và lưu `final`).
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import type { ClientFrame, ConversationSummary, ServerFrame } from "@/lib/assistant-protocol";
+import type { ClientFrame, ConversationSummary, CurrentPageRef, ServerFrame } from "@/lib/assistant-protocol";
 import { AssistantError, getConversation, listConversations, requestWsTicket, resolveWsUrl } from "./client";
 import { chatReducer, initialChatState, type ChatAction, type ChatState, type UiError } from "./reducer";
 
@@ -23,7 +23,7 @@ export interface AssistantOptions {
 export interface AssistantApi {
   state: ChatState;
   conversations: ConversationSummary[];
-  ask: (question: string) => Promise<void>;
+  ask: (question: string, page?: CurrentPageRef | null) => Promise<void>;
   cancel: () => void;
   newConversation: () => void;
   openConversation: (id: string) => Promise<void>;
@@ -247,7 +247,7 @@ export function useAssistant(options: AssistantOptions = {}): AssistantApi {
   });
 
   const ask = useCallback(
-    async (question: string) => {
+    async (question: string, page?: CurrentPageRef | null) => {
       const text = question.trim();
       if (!text || stateRef.current.activeTurnId) return;
       const turnId = (optionsRef.current.newTurnId ?? (() => crypto.randomUUID()))();
@@ -259,6 +259,7 @@ export function useAssistant(options: AssistantOptions = {}): AssistantApi {
           conversation_id: stateRef.current.conversationId,
           turn_id: turnId,
           question: text,
+          ...(page ? { page } : {}),
         };
         ws.send(JSON.stringify(frame));
       } catch (error) {

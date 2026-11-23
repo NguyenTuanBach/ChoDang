@@ -51,6 +51,7 @@ def _system_prompt(**over):
     values = {
         "today": "2026-11-21",
         "user_role": "sinh viên",
+        "current_page": "Người dùng đang mở trang: Đề cương (soạn và nộp đề cương thực tập).",
         "persona": "PERSONA-X",
         "role_workflow": "WORKFLOW-X",
         "school_name": "Trường Mẫu",
@@ -68,6 +69,7 @@ def test_system_prompt_renders_with_all_blocks():
     for block in ("role", "persona", "workflow", "rules", "safeguards", "citation_rules", "refusal_markers"):
         assert f"<{block}>" in prompt and f"</{block}>" in prompt, block
     assert "Trường Mẫu" in prompt and "2026-11-21" in prompt and "sinh viên" in prompt
+    assert "đang mở trang: Đề cương" in prompt
     assert "{{" not in prompt and "}}" not in prompt.replace("]]", "")  # không sót placeholder
     assert "[cite:chunk_id]" in prompt
 

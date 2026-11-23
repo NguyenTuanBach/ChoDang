@@ -31,14 +31,29 @@ from .agent_subject_resolver import AGENT_TOKEN_TTL_MINUTES, AGENT_TOOLS_SCOPE
 log = logging.getLogger(__name__)
 
 _PAGE_KEY = re.compile(r"^[a-z_]{1,40}$")
+_FILTER_KEY = re.compile(r"^[a-z_]{1,40}$")
+_FILTER_VALUE = re.compile(r"^[A-Za-z0-9_]{1,40}$")
 _MAX_ACTION_LABEL = 80
+_MAX_FILTERS = 4
 
 
-def valid_actions(raw: Any) -> list[dict[str, str]]:
+def _positive_id(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def _valid_filters(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    items = [(k, v) for k, v in raw.items() if isinstance(k, str) and _FILTER_KEY.match(k) and isinstance(v, str) and _FILTER_VALUE.match(v)]
+    return dict(items[:_MAX_FILTERS])
+
+
+def valid_actions(raw: Any) -> list[dict[str, Any]]:
     """Hành động giao diện agent đề nghị trong ``final``: chỉ giữ điều hướng hợp lệ (khóa trang chữ thường/gạch dưới, nhãn ngắn), tối đa một.
 
-    FE vẫn tự kiểm khóa theo vai trò và tự đổi sang URL; đây là lớp lọc để BE không chuyển tiếp dữ liệu lạ từ agent tới trình duyệt.
-    Không lưu DB: tải lại lịch sử không có hành động nên không tự điều hướng lại.
+    ``internship_id`` (số nguyên dương) và ``filters`` (tối đa 4 cặp khóa/giá trị ngắn) là tùy chọn: trường sai định dạng thì bỏ trường đó.
+    FE vẫn tự kiểm khóa theo vai trò, khóa lọc theo trang và tự đổi sang URL; quyền xem hồ sơ do BE kiểm khi trang tải. Đây là lớp lọc
+    để BE không chuyển tiếp dữ liệu lạ từ agent tới trình duyệt. Không lưu DB: tải lại lịch sử không có hành động nên không tự điều hướng lại.
     """
     if not isinstance(raw, list):
         return []
@@ -47,8 +62,29 @@ def valid_actions(raw: Any) -> list[dict[str, str]]:
             continue
         page, label = item.get("page"), item.get("label")
         if isinstance(page, str) and _PAGE_KEY.match(page) and isinstance(label, str) and 0 < len(label) <= _MAX_ACTION_LABEL:
-            return [{"type": "navigate", "page": page, "label": label}]
+            action: dict[str, Any] = {"type": "navigate", "page": page, "label": label}
+            internship_id = _positive_id(item.get("internship_id"))
+            if internship_id is not None:
+                action["internship_id"] = internship_id
+            filters = _valid_filters(item.get("filters"))
+            if filters:
+                action["filters"] = filters
+            return [action]
     return []
+
+
+def valid_current_page(raw: Any) -> dict[str, Any] | None:
+    """Trang người dùng đang mở (FE gửi kèm ``ask``): ``{"key", "internship_id"?}``; sai định dạng thì ``None`` (chỉ là ngữ cảnh, không báo lỗi)."""
+    if not isinstance(raw, dict):
+        return None
+    key = raw.get("key")
+    if not isinstance(key, str) or not _PAGE_KEY.match(key):
+        return None
+    page: dict[str, Any] = {"key": key}
+    internship_id = _positive_id(raw.get("internship_id"))
+    if internship_id is not None:
+        page["internship_id"] = internship_id
+    return page
 
 Emit = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -100,7 +136,14 @@ class AssistantOrchestrator:
         self._deadline = deadline_seconds
 
     async def run_turn(
-        self, user: User, conversation_id: str | None, turn_id: str, question: str, emit: Emit, cancel: asyncio.Event | None = None
+        self,
+        user: User,
+        conversation_id: str | None,
+        turn_id: str,
+        question: str,
+        emit: Emit,
+        cancel: asyncio.Event | None = None,
+        current_page: Any = None,
     ) -> None:
         send = _SafeEmitter(emit)
         started = time.monotonic()
@@ -119,6 +162,9 @@ class AssistantOrchestrator:
             "actor": {"role": user.role.value, "agent_token": self._agent_token(user, conv_id, turn_id)},
             "today": self._clock().isoformat(),
         }
+        page = valid_current_page(current_page)
+        if page is not None:
+            start["current_page"] = page
         steps: list[dict[str, Any]] = []
         outcome: dict[str, Any] = {"result": "error", "code": "internal"}
         #: Khung kết thúc (final/error) giữ lại tới sau khi ghi audit: FE nhận nó rồi hỏi tiếp ngay thì lượt này đã xong, không bị ``busy``.

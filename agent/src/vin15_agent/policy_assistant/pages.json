@@ -1,37 +1,283 @@
 {
-  "_doc": "Danh mục trang để trợ lý điều hướng (tool navigate_to). `key` PHẢI khớp `key` trong fe/src/lib/nav.ts (FE có test đối chiếu); FE là nơi duy nhất giữ URL. `common` áp cho mọi vai trò.",
+  "_doc": "Danh mục trang để trợ lý điều hướng (tool navigate_to). `key` PHẢI khớp `key` trong fe/src/lib/nav.ts (FE có test đối chiếu); FE là nơi duy nhất giữ URL. `common` áp cho mọi vai trò. `menu: false` = trang ngoài menu (nav.ts DETAIL_PAGES). `param` = trang cần mã hồ sơ (internship_id). `filters` = bộ lọc mở sẵn: khóa -> giá trị cho phép; FE chỉ nhận khóa có trong nav.ts.",
   "student": [
-    {"key": "overview", "label": "Tổng quan", "description": "trang chủ của sinh viên: hành trình thực tập, việc cần làm, mốc sắp tới"},
-    {"key": "internship", "label": "Hồ sơ", "description": "khai báo và nộp hồ sơ thực tập (doanh nghiệp, thời gian, giấy tiếp nhận)"},
-    {"key": "outline", "label": "Đề cương", "description": "soạn và nộp đề cương thực tập"},
-    {"key": "milestones", "label": "Mốc & minh chứng", "description": "các mốc thực tập và nộp minh chứng theo mốc"},
-    {"key": "journal", "label": "Nhật ký", "description": "nhật ký thực tập hằng tuần"},
-    {"key": "requests", "label": "Gia hạn / ngoại lệ", "description": "tạo yêu cầu gia hạn mốc hoặc xử lý ngoại lệ"},
-    {"key": "final", "label": "Kết thúc & tín chỉ", "description": "kết thúc đợt thực tập, điều kiện và kết quả công nhận tín chỉ"},
-    {"key": "grades", "label": "Bảng điểm", "description": "bảng điểm và kết quả đã đồng bộ"}
+    {
+      "key": "overview",
+      "label": "Tổng quan",
+      "description": "trang chủ của sinh viên: hành trình thực tập, việc cần làm, mốc sắp tới"
+    },
+    {
+      "key": "internship",
+      "label": "Hồ sơ",
+      "description": "khai báo và nộp hồ sơ thực tập (doanh nghiệp, thời gian, giấy tiếp nhận)"
+    },
+    {
+      "key": "outline",
+      "label": "Đề cương",
+      "description": "soạn và nộp đề cương thực tập"
+    },
+    {
+      "key": "milestones",
+      "label": "Mốc & minh chứng",
+      "description": "các mốc thực tập và nộp minh chứng theo mốc"
+    },
+    {
+      "key": "journal",
+      "label": "Nhật ký",
+      "description": "nhật ký thực tập hằng tuần"
+    },
+    {
+      "key": "requests",
+      "label": "Gia hạn / ngoại lệ",
+      "description": "tạo yêu cầu gia hạn mốc hoặc xử lý ngoại lệ"
+    },
+    {
+      "key": "final",
+      "label": "Kết thúc & tín chỉ",
+      "description": "kết thúc đợt thực tập, điều kiện và kết quả công nhận tín chỉ"
+    },
+    {
+      "key": "grades",
+      "label": "Bảng điểm",
+      "description": "bảng điểm và kết quả đã đồng bộ"
+    }
   ],
   "lecturer": [
-    {"key": "queue", "label": "Hàng chờ", "description": "trang chủ của giảng viên: việc cần duyệt, theo thứ tự ưu tiên"},
-    {"key": "students", "label": "Sinh viên", "description": "danh sách sinh viên mình phụ trách"},
-    {"key": "internships", "label": "Hồ sơ", "description": "danh sách hồ sơ thực tập trong phạm vi phụ trách"},
-    {"key": "requests", "label": "Yêu cầu", "description": "yêu cầu gia hạn/ngoại lệ chờ xử lý"},
-    {"key": "flags", "label": "Cờ rủi ro", "description": "cờ rủi ro (mốc quá hạn, thiếu nhật ký, minh chứng yếu)"},
-    {"key": "dashboard", "label": "Dashboard", "description": "số liệu tổng hợp và báo cáo"}
+    {
+      "key": "queue",
+      "label": "Hàng chờ",
+      "description": "trang chủ của giảng viên: việc cần duyệt, theo thứ tự ưu tiên",
+      "filters": {
+        "kind": {
+          "values": [
+            "urgent",
+            "risk",
+            "overdue",
+            "internship",
+            "outline",
+            "milestone",
+            "request",
+            "credit"
+          ],
+          "description": "loại việc: urgent=gấp, risk=cờ rủi ro, overdue=quá hạn, internship=hồ sơ chờ xác nhận, outline=đề cương chờ duyệt, milestone=mốc chờ duyệt, request=yêu cầu gia hạn/ngoại lệ, credit=tín chỉ"
+        }
+      }
+    },
+    {
+      "key": "students",
+      "label": "Sinh viên",
+      "description": "danh sách sinh viên mình phụ trách"
+    },
+    {
+      "key": "internships",
+      "label": "Hồ sơ",
+      "description": "danh sách hồ sơ thực tập trong phạm vi phụ trách",
+      "filters": {
+        "status": {
+          "values": [
+            "draft",
+            "submitted",
+            "revision_requested",
+            "rejected",
+            "confirmed",
+            "in_progress",
+            "pending_credit",
+            "credit_review",
+            "completed",
+            "closed_no_credit"
+          ],
+          "description": "trạng thái hồ sơ: draft=nháp, submitted=chờ GV xác nhận, revision_requested=cần sửa, rejected=bị từ chối, confirmed=đã xác nhận chờ đề cương, in_progress=đang thực tập, pending_credit=chờ thẩm định tín chỉ, credit_review=chờ QTV phê duyệt, completed=hoàn thành, closed_no_credit=kết thúc không công nhận"
+        },
+        "milestone": {
+          "values": [
+            "M1",
+            "M2",
+            "M3",
+            "M4",
+            "M5"
+          ],
+          "description": "mã mốc"
+        },
+        "milestone_status": {
+          "values": [
+            "pending",
+            "submitted",
+            "accepted",
+            "rejected",
+            "overdue"
+          ],
+          "description": "trạng thái của mốc đã chọn (chỉ dùng cùng milestone): pending=chờ nộp, submitted=chờ duyệt, accepted=đã chấp nhận, rejected=bị trả lại, overdue=quá hạn"
+        },
+        "flagged": {
+          "values": [
+            "true"
+          ],
+          "description": "chỉ hồ sơ có cờ rủi ro"
+        }
+      }
+    },
+    {
+      "key": "requests",
+      "label": "Yêu cầu",
+      "description": "yêu cầu gia hạn/ngoại lệ chờ xử lý"
+    },
+    {
+      "key": "flags",
+      "label": "Cờ rủi ro",
+      "description": "cờ rủi ro (mốc quá hạn, thiếu nhật ký, minh chứng yếu)",
+      "filters": {
+        "status": {
+          "values": [
+            "open",
+            "acknowledged",
+            "resolved",
+            "dismissed",
+            "all"
+          ],
+          "description": "trạng thái cờ: open=mới, acknowledged=đã ghi nhận, resolved=đã giải quyết, dismissed=đã bác bỏ, all=tất cả"
+        }
+      }
+    },
+    {
+      "key": "dashboard",
+      "label": "Dashboard",
+      "description": "số liệu tổng hợp và báo cáo"
+    },
+    {
+      "key": "internship_detail",
+      "label": "Chi tiết hồ sơ",
+      "description": "chi tiết hồ sơ thực tập của MỘT sinh viên (đề cương, mốc, minh chứng, yêu cầu); cần internship_id lấy từ tool dữ liệu",
+      "menu": false,
+      "param": "internship_id"
+    }
   ],
   "admin": [
-    {"key": "queue", "label": "Hàng chờ", "description": "trang chủ của quản trị viên: việc cần xử lý"},
-    {"key": "internships", "label": "Hồ sơ", "description": "hồ sơ thực tập toàn khóa"},
-    {"key": "requests", "label": "Yêu cầu", "description": "yêu cầu gia hạn/ngoại lệ"},
-    {"key": "credit", "label": "Tín chỉ", "description": "phê duyệt công nhận tín chỉ"},
-    {"key": "accounts", "label": "Tài khoản", "description": "quản lý tài khoản giảng viên và sinh viên"},
-    {"key": "config", "label": "Cấu hình", "description": "cấu hình mốc, chuẩn đầu ra, loại ngoại lệ"},
-    {"key": "policies", "label": "Quy định", "description": "nạp, xem trước và xuất bản văn bản quy định"},
-    {"key": "lms", "label": "LMS", "description": "đồng bộ điểm/tín chỉ sang LMS"},
-    {"key": "dashboard", "label": "Dashboard", "description": "số liệu tổng hợp và báo cáo"},
-    {"key": "audit", "label": "Audit", "description": "nhật ký kiểm toán hệ thống"}
+    {
+      "key": "queue",
+      "label": "Hàng chờ",
+      "description": "trang chủ của quản trị viên: việc cần xử lý",
+      "filters": {
+        "kind": {
+          "values": [
+            "urgent",
+            "risk",
+            "overdue",
+            "internship",
+            "outline",
+            "milestone",
+            "request",
+            "credit"
+          ],
+          "description": "loại việc: urgent=gấp, risk=cờ rủi ro, overdue=quá hạn, internship=hồ sơ chờ xác nhận, outline=đề cương chờ duyệt, milestone=mốc chờ duyệt, request=yêu cầu gia hạn/ngoại lệ, credit=tín chỉ"
+        }
+      }
+    },
+    {
+      "key": "internships",
+      "label": "Hồ sơ",
+      "description": "hồ sơ thực tập toàn khóa",
+      "filters": {
+        "status": {
+          "values": [
+            "draft",
+            "submitted",
+            "revision_requested",
+            "rejected",
+            "confirmed",
+            "in_progress",
+            "pending_credit",
+            "credit_review",
+            "completed",
+            "closed_no_credit"
+          ],
+          "description": "trạng thái hồ sơ: draft=nháp, submitted=chờ GV xác nhận, revision_requested=cần sửa, rejected=bị từ chối, confirmed=đã xác nhận chờ đề cương, in_progress=đang thực tập, pending_credit=chờ thẩm định tín chỉ, credit_review=chờ QTV phê duyệt, completed=hoàn thành, closed_no_credit=kết thúc không công nhận"
+        },
+        "milestone": {
+          "values": [
+            "M1",
+            "M2",
+            "M3",
+            "M4",
+            "M5"
+          ],
+          "description": "mã mốc"
+        },
+        "milestone_status": {
+          "values": [
+            "pending",
+            "submitted",
+            "accepted",
+            "rejected",
+            "overdue"
+          ],
+          "description": "trạng thái của mốc đã chọn (chỉ dùng cùng milestone): pending=chờ nộp, submitted=chờ duyệt, accepted=đã chấp nhận, rejected=bị trả lại, overdue=quá hạn"
+        },
+        "flagged": {
+          "values": [
+            "true"
+          ],
+          "description": "chỉ hồ sơ có cờ rủi ro"
+        }
+      }
+    },
+    {
+      "key": "requests",
+      "label": "Yêu cầu",
+      "description": "yêu cầu gia hạn/ngoại lệ"
+    },
+    {
+      "key": "credit",
+      "label": "Tín chỉ",
+      "description": "phê duyệt công nhận tín chỉ"
+    },
+    {
+      "key": "accounts",
+      "label": "Tài khoản",
+      "description": "quản lý tài khoản giảng viên và sinh viên"
+    },
+    {
+      "key": "config",
+      "label": "Cấu hình",
+      "description": "cấu hình mốc, chuẩn đầu ra, loại ngoại lệ"
+    },
+    {
+      "key": "policies",
+      "label": "Quy định",
+      "description": "nạp, xem trước và xuất bản văn bản quy định"
+    },
+    {
+      "key": "lms",
+      "label": "LMS",
+      "description": "đồng bộ điểm/tín chỉ sang LMS"
+    },
+    {
+      "key": "dashboard",
+      "label": "Dashboard",
+      "description": "số liệu tổng hợp và báo cáo"
+    },
+    {
+      "key": "audit",
+      "label": "Audit",
+      "description": "nhật ký kiểm toán hệ thống"
+    },
+    {
+      "key": "internship_detail",
+      "label": "Chi tiết hồ sơ",
+      "description": "chi tiết hồ sơ thực tập của MỘT sinh viên (đề cương, mốc, minh chứng, yêu cầu); cần internship_id lấy từ tool dữ liệu",
+      "menu": false,
+      "param": "internship_id"
+    }
   ],
   "common": [
-    {"key": "notifications", "label": "Thông báo", "description": "danh sách thông báo của tôi"},
-    {"key": "assistant", "label": "Trợ lý", "description": "trang trò chuyện với Trợ lý toàn màn hình"}
+    {
+      "key": "notifications",
+      "label": "Thông báo",
+      "description": "danh sách thông báo của tôi"
+    },
+    {
+      "key": "assistant",
+      "label": "Trợ lý",
+      "description": "trang trò chuyện với Trợ lý toàn màn hình"
+    }
   ]
 }

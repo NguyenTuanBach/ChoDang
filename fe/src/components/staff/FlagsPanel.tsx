@@ -2,7 +2,8 @@
 
 import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { send } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { FLAG_KIND, fmtDateTime } from "@/lib/labels";
@@ -66,8 +67,24 @@ export function FlagActions({ flag, reload }: { flag: Flag; reload: () => void }
 }
 
 // Cờ rủi ro do hệ thống/agent tạo; chỉ người (GV/QTV) mới ghi nhận, giải quyết hoặc bác bỏ (C4, C8).
+// Bộ lọc ban đầu lấy từ `?status=` (trợ lý mở trang kèm bộ lọc; `all` = tất cả); giá trị lạ thì "Mới". Query đổi thì dựng lại phần thân.
 export default function FlagsPanel({ base }: { base: "/lecturer" | "/admin" }) {
-  const [status, setStatus] = useState("open");
+  return (
+    <Suspense fallback={null}>
+      <FlagsFromUrl base={base} />
+    </Suspense>
+  );
+}
+
+function FlagsFromUrl({ base }: { base: "/lecturer" | "/admin" }) {
+  const raw = useSearchParams().get("status");
+  const value = raw === "all" ? "" : raw;
+  const initial = value !== null && FILTERS.some((f) => f.value === value) ? value : "open";
+  return <FlagsView key={initial || "all"} base={base} initialStatus={initial} />;
+}
+
+function FlagsView({ base, initialStatus }: { base: "/lecturer" | "/admin"; initialStatus: string }) {
+  const [status, setStatus] = useState(initialStatus);
   const state = useApi<Flag[]>(status ? `/api/flags?status=${status}` : "/api/flags");
   return (
     <Page title="Cờ rủi ro">

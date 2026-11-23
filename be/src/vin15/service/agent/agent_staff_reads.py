@@ -16,8 +16,22 @@ from vin15.domain.model.user import User
 from vin15.infrastructure.persistence.user_repository import UserRepository
 from vin15.service.dashboard.report_service import ReportService
 from vin15.service.monitoring.monitoring_service import MonitoringService
+from vin15.service.policy.policy_search_service import normalize
 
 MAX_ITEMS = 30
+
+
+def _matches_student(row: dict[str, Any], query: str) -> bool:
+    """Khớp tên theo đầu từ, không dấu, không phân biệt hoa thường: mỗi từ của chuỗi tìm là phần đầu của một từ trong tên
+    ("an" khớp "Nguyễn Văn An" nhưng không khớp "Trần", "Toàn"; "nguyen an" khớp "Nguyễn Văn An"). Hoặc mã sinh viên chứa chuỗi tìm."""
+    needle = normalize(query).split()
+    if not needle:
+        return False
+    words = normalize(str(row.get("student_name") or "")).split()
+    code = normalize(str(row.get("student_code") or ""))
+    return all(any(w.startswith(n) for w in words) for n in needle) or (len(needle) == 1 and bool(code) and needle[0] in code)
+
+
 _OPEN_FLAG_STATUSES = ("open", "acknowledged")
 
 
@@ -137,10 +151,14 @@ class AgentStaffReads:
             credit_outcomes={r["status"]: r["n"] for r in data["credit_outcomes"]},
         )
 
-    def internships(self, subject: AgentToolSubject, status: str | None, overdue_only: bool, cohort: str | None) -> InternshipsResult:
+    def internships(
+        self, subject: AgentToolSubject, status: str | None, overdue_only: bool, cohort: str | None, student: str | None = None
+    ) -> InternshipsResult:
         rows = self._reports.list_internships(self._user(subject), status=status or None, cohort=cohort or None)
         if overdue_only:
             rows = [r for r in rows if r["overdue_milestones"] > 0]
+        if student and student.strip():
+            rows = [r for r in rows if _matches_student(r, student)]
         items = [
             InternshipItem(
                 r["id"], r["cohort"], r["status"], r["student_name"], r["company_name"], r.get("start_date"), r.get("end_date"),

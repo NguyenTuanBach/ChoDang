@@ -59,7 +59,8 @@ export default function ChatThread({ assistant, onCite }: Props) {
             onCite={onCite}
             onReload={() => void assistant.reload()}
             openedPages={turn.actions.flatMap((action) => {
-              const page = action.type === "navigate" ? pageHref(user.role, action.page) : null;
+              const page =
+                action.type === "navigate" ? pageHref(user.role, action.page, { internshipId: action.internship_id, filters: action.filters }) : null;
               return page ? [page] : [];
             })}
           />

@@ -96,6 +96,37 @@ describe("AssistantProvider: điều hướng theo lời trợ lý", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/lecturer/flags"));
   });
 
+  it("trang chi tiết hồ sơ và bộ lọc thành đúng URL", async () => {
+    const user = userEvent.setup();
+    setup("lecturer");
+    const socket = await ask(user, "mở hồ sơ của An");
+    act(() =>
+      socket.receive(
+        finalFrame("t1", { answer: "Đã mở.", citations: [], actions: [{ type: "navigate", page: "internship_detail", label: "Chi tiết hồ sơ", internship_id: 7, filters: null }] }),
+      ),
+    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/lecturer/internships/7"));
+    expect(screen.getByRole("link", { name: /Đã mở: Chi tiết hồ sơ/ })).toHaveAttribute("href", "/lecturer/internships/7");
+  });
+
+  it("bộ lọc thành query string, khóa lạ bị bỏ", async () => {
+    const user = userEvent.setup();
+    setup("lecturer");
+    const socket = await ask(user, "mở cờ đã giải quyết");
+    act(() =>
+      socket.receive(finalFrame("t1", { answer: "Đã mở.", citations: [], actions: [{ type: "navigate", page: "flags", label: "Cờ rủi ro", filters: { status: "resolved", evil: "x" } }] })),
+    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/lecturer/flags?status=resolved"));
+  });
+
+  it("câu hỏi gửi kèm trang đang mở", async () => {
+    const user = userEvent.setup();
+    setup("student");
+    const socket = await ask(user, "trang này để làm gì?");
+    const frame = socket.sent.find((f) => f.type === "ask");
+    expect(frame?.page).toEqual({ key: "overview" }); // usePathname giả = "/student"
+  });
+
   it("câu trả lời không có action thì không điều hướng", async () => {
     const user = userEvent.setup();
     setup();

@@ -6,7 +6,6 @@ from vin15.domain.exception import ForbiddenRoleError
 from vin15.domain.model.agent_tool import AgentToolSubject
 from vin15.domain.model.user import Role, User
 
-
 #: Cookie phiên do ``/api/auth/*`` đặt (HttpOnly).
 SESSION_COOKIE = "session"
 

@@ -17,7 +17,7 @@ Bắt tay kiểm service token (sai → từ chối/đóng 4401). Khung đầu t
 Khung (JSON, có `type`):
 | type | hướng | trường |
 |---|---|---|
-| `start` | BE→agent | `conversation_id, turn_id, question, history[{role,content}], actor{role, agent_token}, today(YYYY-MM-DD)` |
+| `start` | BE→agent | `conversation_id, turn_id, question, history[{role,content}], actor{role, agent_token}, today(YYYY-MM-DD), current_page?{key, internship_id?}` (`current_page`: trang người dùng đang mở, chỉ là ngữ cảnh cho prompt; BE bỏ nếu sai định dạng) |
 | `cancel` | →agent | `{}` |
 | `ping` / `pong` | hai chiều | `{}` |
 | `ready` | agent→BE | `{}` (sau khi nhận `start` hợp lệ) |
@@ -25,7 +25,7 @@ Khung (JSON, có `type`):
 | `tool_call` | agent→ | `name, label` |
 | `tool_result` | agent→ | `name, ok, summary` |
 | `token` | agent→ | `delta` |
-| `final` | agent→ | `answer, citations[], verdict, degraded, usage{prompt_tokens,completion_tokens,provider,model}, trace_id, actions[]` (`actions` mặc định `[]`; mỗi phần tử `{type:"navigate", page:<khóa trang>, label}` — hành động giao diện do tool `navigate_to` đề nghị. BE chỉ chuyển tiếp tối đa một điều hướng hợp lệ (`page` khớp `^[a-z_]{1,40}$`, `label` ≤ 80 ký tự), không lưu DB; FE tự đổi khóa sang URL theo vai trò và bỏ qua khóa lạ) |
+| `final` | agent→ | `answer, citations[], verdict, degraded, usage{prompt_tokens,completion_tokens,provider,model}, trace_id, actions[]` (`actions` mặc định `[]`; mỗi phần tử `{type:"navigate", page:<khóa trang>, label, internship_id?, filters?{khóa:giá trị}}` — hành động giao diện do tool `navigate_to` đề nghị. BE chỉ chuyển tiếp tối đa một điều hướng hợp lệ (`page` khớp `^[a-z_]{1,40}$`, `label` ≤ 80 ký tự; `internship_id` số nguyên dương; `filters` ≤ 4 cặp, khóa `^[a-z_]{1,40}$`, giá trị `^[A-Za-z0-9_]{1,40}$`; trường tùy chọn sai thì bỏ riêng trường đó), không lưu DB; FE tự đổi khóa sang URL theo vai trò, chỉ giữ khóa lọc trang khai báo và bỏ qua khóa lạ) |
 | `error` | agent→ | `code` (`busy\|rate_limited\|timeout\|cancelled\|llm_unavailable\|internal`), `message` |
 
 `verdict`: `answered | no_match | refused | needs_human | degraded | error_fallback`.
@@ -34,7 +34,7 @@ Khung (JSON, có `type`):
 
 ## 4. FE ↔ BE
 - `POST /api/assistant/ws-ticket` (cần người dùng; dev: người dùng mặc định) → `{"ticket":"...","expires_in":30}`; vé dùng một lần.
-- `WS /api/assistant/ws`: kiểm `Origin` ∈ `CORS_ORIGINS`. Khung FE→BE: `auth{ticket}` (≤ 5 s sau khi mở), `ask{conversation_id|null, turn_id, question}`, `cancel{turn_id}`, `ping{}`. BE→FE: `ready{}` sau `auth` đúng; mọi khung của lượt như bảng trên, **BE thêm** `turn_id` và `conversation_id` vào mỗi khung; `final` thêm `message_id`. `error` thêm các mã `busy` (đang có lượt), `rate_limited`, `invalid_frame`. Đóng: 1000 xong, 4401 xác thực, 4408 im lặng quá hạn, 4429 giới hạn kết nối.
+- `WS /api/assistant/ws`: kiểm `Origin` ∈ `CORS_ORIGINS`. Khung FE→BE: `auth{ticket}` (≤ 5 s sau khi mở), `ask{conversation_id|null, turn_id, question, page?{key, internship_id?}}` (`page`: trang đang mở, BE chuyển thành `start.current_page`), `cancel{turn_id}`, `ping{}`. BE→FE: `ready{}` sau `auth` đúng; mọi khung của lượt như bảng trên, **BE thêm** `turn_id` và `conversation_id` vào mỗi khung; `final` thêm `message_id`. `error` thêm các mã `busy` (đang có lượt), `rate_limited`, `invalid_frame`. Đóng: 1000 xong, 4401 xác thực, 4408 im lặng quá hạn, 4429 giới hạn kết nối.
 - BE tự: cắt lịch sử (≤ `ASSISTANT_HISTORY_TURNS` lượt cuối) và che PII lịch sử trước khi gửi agent (agent che lần nữa); nếu FE rớt giữa lượt, BE chạy hết và lưu `final`.
 - REST (người chủ): `GET /api/assistant/conversations` → `[{id,title,created_at,updated_at}]`; `GET /api/assistant/conversations/{id}` → `{id,title,messages:[{id,turn_id,role,content,citations,degraded,created_at}]}`; `GET /api/assistant/traces/{trace_id}` (chủ hoặc admin).
 

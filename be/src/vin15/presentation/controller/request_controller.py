@@ -6,7 +6,14 @@ from fastapi import APIRouter, Depends, File, Response, UploadFile
 
 from vin15.config.container import Container
 from vin15.domain.model.user import User
-from vin15.presentation.dto.workflow import AssessBody, CreditDecisionBody, ExceptionBody, ExceptionTypeBody, ExtensionBody, RequestDecisionBody
+from vin15.presentation.dto.workflow import (
+    AssessBody,
+    CreditDecisionBody,
+    ExceptionBody,
+    ExceptionTypeBody,
+    ExtensionBody,
+    RequestDecisionBody,
+)
 
 from .dependencies import admin_user, container, current_user, lecturer_user, staff_user, student_user
 from .internship_controller import file_response, read_upload

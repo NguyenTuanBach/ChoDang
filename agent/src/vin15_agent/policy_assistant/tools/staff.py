@@ -33,7 +33,25 @@ class StaffTool(BaseTool):
             data = await self._be.staff(self._endpoint, params)
         except BeToolError as exc:
             return ToolResult.failure(exc.code, exc.message)
+        ctx.seen_internship_ids.update(_internship_ids(data, self._endpoint))
         return ToolResult.success(data, f"Đã đọc: {self.label.lower()}")
+
+
+def _internship_ids(data: Any, endpoint: str) -> set[int]:
+    """Mã hồ sơ trong kết quả (``id`` ở danh sách hồ sơ, ``internship_id`` ở hàng chờ/cờ) để ``navigate_to`` mở được trang chi tiết."""
+    items = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return set()
+    keys = ("id", "internship_id") if endpoint == "internships" else ("internship_id",)
+    found: set[int] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        for key in keys:
+            value = item.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                found.add(value)
+    return found
 
 
 def build_staff_tools(be: BeToolsClient) -> list[StaffTool]:
@@ -57,8 +75,15 @@ def build_staff_tools(be: BeToolsClient) -> list[StaffTool]:
         ),
         StaffTool(
             be, name="list_internships", endpoint="internships", label="Xem danh sách hồ sơ thực tập",
-            description="Danh sách hồ sơ thực tập trong phạm vi của người hỏi, kèm số mốc quá hạn, mốc chờ duyệt, cờ đang mở. "
-            "Trả tổng số (total) và tối đa 30 hồ sơ đầu.",
-            parameters=_schema({"status": _STATUS, "overdue_only": {"type": "boolean", "description": "Chỉ hồ sơ có mốc quá hạn."}, "cohort": _COHORT}),
+            description="Danh sách hồ sơ thực tập trong phạm vi của người hỏi (mỗi hồ sơ có id = mã hồ sơ), kèm số mốc quá hạn, mốc chờ duyệt, "
+            "cờ đang mở. Trả tổng số (total) và tối đa 30 hồ sơ đầu. Tìm hồ sơ của một sinh viên cụ thể (để mở trang chi tiết) thì truyền student.",
+            parameters=_schema(
+                {
+                    "status": _STATUS,
+                    "overdue_only": {"type": "boolean", "description": "Chỉ hồ sơ có mốc quá hạn."},
+                    "cohort": _COHORT,
+                    "student": {"type": "string", "description": "Tên (một phần, có dấu hay không dấu đều được) hoặc mã sinh viên (tùy chọn)."},
+                }
+            ),
         ),
     ]

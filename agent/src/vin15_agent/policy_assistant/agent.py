@@ -20,6 +20,7 @@ from vin15_agent.core.tools import TurnContext
 from vin15_agent.core.tracing import TurnTrace
 from vin15_agent.policy_assistant.be_client import BeClientFactory, BeToolsClient
 from vin15_agent.policy_assistant.degraded import degraded_answer, render_chunk_listing
+from vin15_agent.policy_assistant.pages import find_page
 from vin15_agent.policy_assistant.protocol import (
     Action,
     Citation,
@@ -81,6 +82,8 @@ class PolicyAssistant:
         redactor = PiiRedactor(self._settings.pii_student_id_pattern)
         trace = TurnTrace(redactor=redactor)
         ctx = TurnContext(actor_role=start.actor.role, today=start.today, agent_token=start.actor.agent_token, redactor=redactor, trace=trace)
+        if start.current_page is not None and start.current_page.internship_id is not None:
+            ctx.seen_internship_ids.add(start.current_page.internship_id)  # "mở lại / lọc tiếp hồ sơ này"
         be = self._be_factory(start.actor.agent_token)
         try:
             await self._run(start, ctx, be, emit)
@@ -157,6 +160,7 @@ class PolicyAssistant:
             role_workflow=parts["workflow"],
             today=start.today,
             user_role=ROLE_LABELS[role],
+            current_page=_current_page_line(start),
             school_name=self._settings.school_name,
             sample_notice=self._templates.get("sample_notice", "") if self._settings.assistant_sample_notice else "",
             citation_rules=loader.raw("citation_rules"),
@@ -192,7 +196,7 @@ class PolicyAssistant:
 
         cites = verify_citations(text, ctx.seen_chunks.keys(), no_basis_partial=tpl("no_basis_partial"))
         text = guard_commitments(cites.text, t["no_commitment"]).text
-        extra_sources = [question, start.today, *(h.content for h in start.history)]
+        extra_sources = [question, start.today, _current_page_line(start), *(h.content for h in start.history)]
         text = check_numbers(text, number_sources(ctx.seen_chunks, ctx.tool_texts, extra_sources), t["number_mismatch"]).text
 
         cited_ids = list(dict.fromkeys(CITE_RE.findall(text)))
@@ -252,6 +256,18 @@ class PolicyAssistant:
             "Lượt hỏi xong trace=%s verdict=%s degraded=%s llm_calls=%d tools=%d ms=%d",
             trace.trace_id, answer.verdict, degraded, trace.llm_calls, len(trace.tool_calls), trace.elapsed_ms(),
         )  # fmt: skip
+
+
+def _current_page_line(start: StartFrame) -> str:
+    """Dòng ngữ cảnh "người dùng đang mở trang nào" cho prompt. Khóa lạ với vai trò (hoặc FE không gửi) thì bỏ trống."""
+    current = start.current_page
+    page = find_page(start.actor.role, current.key) if current is not None else None
+    if current is None or page is None:
+        return ""
+    line = f"Người dùng đang mở trang: {page.label} ({page.description})"
+    if page.param == "internship_id" and current.internship_id is not None:
+        line += f", hồ sơ mã {current.internship_id}"
+    return line + "."
 
 
 def token_pieces(text: str, words_per_piece: int = _WORDS_PER_TOKEN) -> list[str]:
