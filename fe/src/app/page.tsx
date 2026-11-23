@@ -27,7 +27,7 @@ const FEATURES: { eyebrow: string; title: string; text: string; rows?: string[];
     eyebrow: "Theo dõi tiến độ",
     title: "Mọi mốc và minh chứng, một nơi.",
     text: "Thanh hành trình cho biết bạn đang ở bước nào, việc gì cần làm tiếp và hạn nộp. Giảng viên thấy cảnh báo sớm khi sinh viên chậm tiến độ.",
-    image: { src: "/landing/progress.png", alt: "Trang Mốc và minh chứng của sinh viên với các mốc đã chấp nhận, mốc hiện tại và mốc chờ nộp", width: 1900, height: 863 },
+    image: { src: "/landing/progress-tracker.png", alt: "Trang Mốc và minh chứng của sinh viên với các mốc đã chấp nhận, mốc hiện tại và mốc chờ nộp", width: 1888, height: 868 },
   },
   {
     eyebrow: "Phê duyệt",
