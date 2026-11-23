@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import type { Citation } from "@/lib/assistant-protocol";
 import { cn } from "@/lib/utils";
 import { useAssistantContext } from "./AssistantProvider";
+import AutofillCards from "./AutofillCard";
 import ChatThread from "./ChatThread";
 import CitationPanel from "./CitationPanel";
 import Composer from "./Composer";
@@ -22,7 +23,7 @@ export const CONNECTION_TEXT = {
 
 // Ngăn Trợ lý gọn: tiêu đề + trạng thái kết nối + chọn/mới hội thoại, luồng chat, ô nhập. Trích dẫn mở thay luồng chat (có nút Đóng).
 export default function AssistantPanel({ onClose }: { onClose?: () => void }) {
-  const { assistant } = useAssistantContext();
+  const { assistant, canAttach, attachDocument } = useAssistantContext();
   const { state } = assistant;
   const [selected, setSelected] = useState<Citation | null>(null);
   const running = state.activeTurnId !== null;
@@ -111,7 +112,8 @@ export default function AssistantPanel({ onClose }: { onClose?: () => void }) {
         </p>
       )}
 
-      <Composer compact running={running} onSend={(text) => void assistant.ask(text)} onStop={assistant.cancel} />
+      <AutofillCards />
+      <Composer compact running={running} onSend={(text) => void assistant.ask(text)} onStop={assistant.cancel} onAttach={canAttach ? attachDocument : undefined} />
     </section>
   );
 }

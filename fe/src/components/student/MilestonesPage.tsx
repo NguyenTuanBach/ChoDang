@@ -2,16 +2,24 @@
 
 import { Check, FileText } from "lucide-react";
 import { useState } from "react";
+import AutofillPrompt from "@/components/shared/AutofillPrompt";
+import { usePendingAutofill, type PendingAutofill } from "@/lib/autofill";
 import { send, upload } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { fmtDate, fmtDateTime } from "@/lib/labels";
 import type { InternshipDetail, Milestone } from "@/lib/types";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, Page, Row, StatusBadge } from "@/components/ui/ui";
 import { cn } from "@/lib/utils";
+import EvidenceFieldsForm from "./EvidenceFieldsForm";
+
+//: Mốc có giấy xác nhận / phiếu đánh giá của doanh nghiệp: AI đọc giấy để điền thông tin.
+const COMPLETION_CODE = "M5";
 
 // Các mốc bắt buộc dạng dòng thời gian dọc: mốc xong có dấu tích xanh, mốc tiếp theo nổi bật, mốc quá hạn viền đỏ.
 export default function MilestonesPage() {
   const state = useApi<InternshipDetail>("/api/student/internship");
+  // Giấy xác nhận đính kèm trong ngăn Trợ lý: BE đã lưu làm minh chứng M5; tải lại để thấy tệp, rồi điền nháp vào form của tệp đó.
+  const auto = usePendingAutofill("completion_letter", state.reload);
   return (
     <Page title="Mốc và minh chứng">
       <Async state={state}>
@@ -23,7 +31,18 @@ export default function MilestonesPage() {
             <Card title="Các mốc bắt buộc">
               <ol className="m-0 list-none p-0">
                 {d.milestones.map((m, i) => (
-                  <MilestoneStep key={m.id} index={i + 1} last={i === d.milestones.length - 1} current={m.id === currentId} milestone={m} detail={d} reload={state.reload} />
+                  <MilestoneStep
+                    key={m.id}
+                    index={i + 1}
+                    last={i === d.milestones.length - 1}
+                    current={m.id === currentId}
+                    milestone={m}
+                    detail={d}
+                    reload={state.reload}
+                    autofill={m.code === COMPLETION_CODE ? auto.value : null}
+                    autofillNonce={auto.nonce}
+                    onAutofillSaved={auto.clear}
+                  />
                 ))}
               </ol>
             </Card>
@@ -42,7 +61,27 @@ function dueText(m: Milestone): string {
   return `${base} · còn ${m.days_left} ngày`;
 }
 
-function MilestoneStep({ index, last, current, milestone: m, detail, reload }: { index: number; last: boolean; current: boolean; milestone: Milestone; detail: InternshipDetail; reload: () => void }) {
+function MilestoneStep({
+  index,
+  last,
+  current,
+  milestone: m,
+  detail,
+  reload,
+  autofill,
+  autofillNonce,
+  onAutofillSaved,
+}: {
+  index: number;
+  last: boolean;
+  current: boolean;
+  milestone: Milestone;
+  detail: InternshipDetail;
+  reload: () => void;
+  autofill: PendingAutofill | null;
+  autofillNonce: number;
+  onAutofillSaved: () => void;
+}) {
   // Các lần nộp minh chứng của mốc, theo thứ tự thời gian: Lần 1, Lần 2...
   const evidence = detail.evidence.filter((e) => e.milestone_code === m.code).sort((a, b) => a.submitted_at.localeCompare(b.submitted_at) || a.id - b.id);
   const working = ["in_progress", "pending_credit"].includes(detail.internship?.status ?? "");
@@ -52,6 +91,17 @@ function MilestoneStep({ index, last, current, milestone: m, detail, reload }: {
   const up = useAction(reload);
   const submit = useAction(reload);
   const [extending, setExtending] = useState(false);
+  const [prompt, setPrompt] = useState<number | null>(null);
+  const [autoExtractId, setAutoExtractId] = useState<number | null>(null);
+  const isCompletion = m.code === COMPLETION_CODE;
+
+  async function uploadEvidence(file: File) {
+    let id: number | null = null;
+    const ok = await up.run(async () => {
+      id = (await upload<{ id: number }>(`/api/student/milestones/${m.code}/evidence`, file)).id;
+    });
+    if (ok && id !== null && isCompletion && /\.(pdf|png|jpe?g)$/i.test(file.name)) setPrompt(id);
+  }
 
   return (
     <li className={cn("relative grid grid-cols-[2.5rem_1fr] gap-x-4", !last && "pb-8")}>
@@ -114,6 +164,21 @@ function MilestoneStep({ index, last, current, milestone: m, detail, reload }: {
                       {e.reviewer_comment}
                     </p>
                   )}
+                  {isCompletion && !failed && (
+                    <div className="mt-2">
+                      <EvidenceFieldsForm
+                        key={`${e.id}-${autofill?.evidenceId === e.id ? autofillNonce : 0}-${autoExtractId === e.id ? 1 : 0}`}
+                        evidence={e}
+                        editable={working && !locked}
+                        autofill={autofill?.evidenceId === e.id ? autofill : null}
+                        autoExtract={autoExtractId === e.id}
+                        onSaved={() => {
+                          if (autofill?.evidenceId === e.id) onAutofillSaved();
+                          reload();
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -124,7 +189,7 @@ function MilestoneStep({ index, last, current, milestone: m, detail, reload }: {
         {m.submittable && working && !locked && (
           <div className="mt-4">
             <Row>
-              <FilePicker label="Tải minh chứng" accept=".pdf,.png,.jpg,.jpeg,.docx" disabled={up.busy} onFile={(file) => void up.run(() => upload(`/api/student/milestones/${m.code}/evidence`, file))} />
+              <FilePicker label="Tải minh chứng" accept=".pdf,.png,.jpg,.jpeg,.docx" disabled={up.busy} onFile={(file) => void uploadEvidence(file)} />
               <Button variant="primary" disabled={submit.busy || evidence.filter((e) => e.status !== "rejected").length === 0} onClick={() => void submit.run(() => send("POST", `/api/student/milestones/${m.code}/submit`))}>
                 Nộp mốc
               </Button>
@@ -137,6 +202,14 @@ function MilestoneStep({ index, last, current, milestone: m, detail, reload }: {
             <Button onClick={() => setExtending((v) => !v)}>{extending ? "Đóng" : "Xin gia hạn"}</Button>
           </div>
         )}
+        <AutofillPrompt
+          open={prompt !== null}
+          onYes={() => {
+            setAutoExtractId(prompt);
+            setPrompt(null);
+          }}
+          onNo={() => setPrompt(null)}
+        />
         {extending && (
           <ExtensionForm
             milestone={m}

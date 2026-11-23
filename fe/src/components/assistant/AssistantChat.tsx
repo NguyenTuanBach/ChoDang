@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Citation } from "@/lib/assistant-protocol";
 import { useAssistantContext } from "./AssistantProvider";
 import { CONNECTION_TEXT } from "./AssistantPanel";
+import AutofillCards from "./AutofillCard";
 import ChatThread from "./ChatThread";
 import CitationPanel from "./CitationPanel";
 import Composer from "./Composer";
@@ -13,7 +14,7 @@ import { ERROR_TEXT } from "./messages";
 // Trang /assistant toàn màn hình: danh sách hội thoại bên trái, luồng chat ở giữa, nguyên văn trích dẫn bên phải.
 // Dùng chung phiên với ngăn Trợ lý (cùng AssistantProvider), nên hội thoại đang mở ở ngăn sẽ hiện ở đây.
 export default function AssistantChat() {
-  const { assistant } = useAssistantContext();
+  const { assistant, canAttach, attachDocument } = useAssistantContext();
   const { state } = assistant;
   const [selected, setSelected] = useState<Citation | null>(null);
   const running = state.activeTurnId !== null;
@@ -55,7 +56,8 @@ export default function AssistantChat() {
           </p>
         )}
 
-        <Composer running={running} onSend={(text) => void assistant.ask(text)} onStop={assistant.cancel} />
+        <AutofillCards />
+        <Composer running={running} onSend={(text) => void assistant.ask(text)} onStop={assistant.cancel} onAttach={canAttach ? attachDocument : undefined} />
       </section>
 
       {selected && (

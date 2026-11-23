@@ -8,6 +8,7 @@ from vin15.config.container import Container
 from vin15.domain.model.user import User
 from vin15.presentation.dto.workflow import (
     CommentBody,
+    EvidenceFieldsBody,
     JournalAdviceBody,
     JournalBody,
     JournalItemsBody,
@@ -48,6 +49,21 @@ def upload_evidence(
     app: Container = Depends(container),
 ) -> dict:
     return {"id": app.milestone_service.upload_evidence(student, code, file.filename or "tep", read_upload(file, app.settings.upload_max_bytes), title)}
+
+
+@router.post("/api/student/evidence/{evidence_id}/extract", summary="AI gợi ý các trường từ giấy xác nhận / phiếu đánh giá (SV xác nhận từng trường)")
+async def extract_evidence(evidence_id: int, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    return await app.intake_service.extract_evidence(student, evidence_id)
+
+
+@router.put("/api/student/evidence/{evidence_id}/fields", summary="SV xác nhận thông tin trên giấy; BE đối chiếu với hồ sơ")
+def confirm_evidence_fields(evidence_id: int, body: EvidenceFieldsBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    return app.milestone_service.confirm_evidence_fields(student, evidence_id, body.fields, body.confirmations)
+
+
+@router.post("/api/student/intake/auto", summary="Đính kèm giấy trong Trợ lý: AI nhận loại giấy, lưu vào đúng chỗ, trả gợi ý trường")
+async def auto_intake(file: UploadFile = File(...), student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    return await app.intake_service.auto_intake(student, file.filename or "tep", read_upload(file, app.settings.upload_max_bytes))
 
 
 @router.post("/api/milestones/{milestone_id}/accept", status_code=204, summary="GV chấp nhận mốc (HITL)")

@@ -18,6 +18,9 @@ dependencies = [
     "pyyaml>=6",
     # Đọc văn bản từ PDF giấy tiếp nhận (chuẩn hóa hồ sơ).
     "pypdf>=4",
+    # Dựng PDF quét thành ảnh để model vision đọc (giấy tiếp nhận / giấy xác nhận).
+    "pypdfium2>=4",
+    "pillow>=10",
 ]
 
 [project.scripts]

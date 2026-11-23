@@ -35,6 +35,7 @@ _REQUIRED = {
     "job_description": "Mô tả công việc",
 }
 _EDITABLE = ("draft", "revision_requested")
+_DATE_FIELDS = ("start_date", "end_date", "receipt_letter_date")
 _DOC_PREFIX = "internship"
 
 
@@ -94,7 +95,7 @@ class InternshipService:
             current = self._cases.student_internship(student.id)
         assert current is not None
         # Cột văn bản không cho NULL: trường bỏ trống lưu là chuỗi rỗng; ngày bỏ trống lưu NULL; hình thức không gửi thì giữ nguyên.
-        fields = {k: ("" if v is None and k not in ("start_date", "end_date") else v) for k, v in fields.items() if not (k == "mode" and v is None)}
+        fields = {k: ("" if v is None and k not in _DATE_FIELDS else v) for k, v in fields.items() if not (k == "mode" and v is None)}
         self._check_fields(fields)
         self._cases.update_profile(current["id"], fields, confirmations)
         return self._cases.get_internship(current["id"]) or current
@@ -110,7 +111,8 @@ class InternshipService:
     def upload_document(self, student: User, filename: str, data: bytes) -> dict:
         current = self._cases.student_internship(student.id)
         if current is None:
-            raise StateConflictError("Hãy lưu thông tin hồ sơ trước khi tải giấy tiếp nhận")
+            # Cho tải giấy trước khi gõ gì (vd. đính kèm trong ngăn Trợ lý): tạo hồ sơ nháp rỗng.
+            current = self.save_draft(student, {})
         if current["status"] not in _EDITABLE:
             raise StateConflictError("Hồ sơ đã nộp, không tải thêm tệp")
         stored = store_upload(self._storage, f"{_DOC_PREFIX}/{current['id']}", filename, data, RECEIPT_TYPES, self._max_bytes)

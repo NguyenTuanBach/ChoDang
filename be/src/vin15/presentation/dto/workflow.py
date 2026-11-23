@@ -45,8 +45,21 @@ class InternshipDraftBody(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     mode: Literal["onsite", "remote", "hybrid"] | None = None
+    department: str | None = Field(default=None, max_length=200)
+    mentor_title: str | None = Field(default=None, max_length=200)
+    receipt_letter_number: str | None = Field(default=None, max_length=100)
+    receipt_letter_date: date | None = None
+    receipt_signer_name: str | None = Field(default=None, max_length=200)
+    receipt_signer_title: str | None = Field(default=None, max_length=200)
     #: Từng trường do AI gợi ý đã được SV xác nhận: ``{"company_name": "ai_confirmed"}``.
     confirmations: dict[str, Literal["ai_confirmed", "manual"]] = Field(default_factory=dict)
+
+
+class EvidenceFieldsBody(BaseModel):
+    """Trường SV đã xác nhận từ giấy xác nhận / phiếu đánh giá (M5). Khóa lạ bị BE bỏ qua."""
+
+    fields: dict[str, str] = Field(default_factory=dict, max_length=30)
+    confirmations: dict[str, Literal["ai_confirmed", "manual"]] = Field(default_factory=dict, max_length=30)
 
 
 class DecisionBody(BaseModel):

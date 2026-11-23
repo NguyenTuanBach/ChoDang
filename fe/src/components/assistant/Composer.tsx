@@ -1,7 +1,7 @@
 "use client";
 
-import { SendHorizontal, Square } from "lucide-react";
-import { useState, type KeyboardEvent } from "react";
+import { Paperclip, SendHorizontal, Square } from "lucide-react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -9,11 +9,14 @@ interface Props {
   onSend: (text: string) => void;
   onStop: () => void;
   compact?: boolean;
+  // Có thì hiện nút đính kèm giấy (PDF, ảnh chụp, bản scan) để AI đọc và tự điền.
+  onAttach?: (file: File) => void;
 }
 
 // Ô nhập câu hỏi: Enter gửi, Shift+Enter xuống dòng (không gửi khi đang gõ tiếng Việt bằng bộ gõ).
-export default function Composer({ running, onSend, onStop, compact = false }: Props) {
+export default function Composer({ running, onSend, onStop, compact = false, onAttach }: Props) {
   const [draft, setDraft] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
 
   function submit() {
     if (!draft.trim() || running) return;
@@ -36,6 +39,30 @@ export default function Composer({ running, onSend, onStop, compact = false }: P
         submit();
       }}
     >
+      {onAttach && (
+        <>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onAttach(file);
+              event.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Đính kèm giấy tiếp nhận / giấy xác nhận để AI tự điền"
+            title="Đính kèm giấy (PDF, ảnh) để AI tự điền"
+            onClick={() => fileInput.current?.click()}
+          >
+            <Paperclip className="size-4" aria-hidden="true" />
+          </button>
+        </>
+      )}
       <textarea
         value={draft}
         onChange={(event) => setDraft(event.target.value)}

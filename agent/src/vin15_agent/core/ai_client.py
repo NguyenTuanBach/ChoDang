@@ -3,7 +3,7 @@
 Chỉ chuyển sang dự phòng khi lỗi tạm thời (mất kết nối, hết thời gian chờ, bị giới hạn tốc độ, 5xx).
 Lỗi do yêu cầu hoặc khóa sai (400, 401, 403...) được ném lại nguyên vẹn, không đổi đường để khỏi che lỗi cấu hình.
 
-Mỗi đường khai báo khả năng (``tools``, ``stream``, ``embed``). Khi cần một khả năng, chỉ thử các đường có khả năng đó;
+Mỗi đường khai báo khả năng (``tools``, ``stream``, ``embed``, ``vision`` = nhận ảnh trong tin nhắn). Khi cần một khả năng, chỉ thử các đường có khả năng đó;
 không đường nào đủ thì ném ``LlmUnavailableError`` (agent sẽ chuyển sang chế độ suy giảm).
 """
 
@@ -22,9 +22,9 @@ from vin15_agent.shared.settings import Settings
 logger = logging.getLogger(__name__)
 
 Message = dict[str, Any]
-Capability = Literal["tools", "stream", "embed"]
+Capability = Literal["tools", "stream", "embed", "vision"]
 OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
-ALL_CAPABILITIES: frozenset[str] = frozenset({"tools", "stream", "embed"})
+ALL_CAPABILITIES: frozenset[str] = frozenset({"tools", "stream", "embed", "vision"})
 T = TypeVar("T")
 
 #: Model suy luận không nhận ``temperature`` và tính token suy luận vào trần đầu ra.
@@ -206,11 +206,13 @@ class AiClient:
         temperature: float | None = None,
         max_tokens: int | None = None,
         reasoning_effort: str | None = None,
+        capability: Capability | None = None,
     ) -> ChatResult:
-        required = "tools" if tools else None
+        """``capability`` đòi thêm một khả năng (vd. ``vision`` khi tin nhắn có ảnh); có ``tools`` thì luôn đòi ``tools``."""
         return await self._with_fallback(
-            required,
+            "tools" if tools else None,
             lambda ep: self._chat_once(ep, messages, tools, tool_choice, temperature, max_tokens, reasoning_effort),
+            also=(capability,) if capability else (),
         )
 
     async def chat_stream(
@@ -266,9 +268,9 @@ class AiClient:
             raise LlmUnavailableError(f"Không có đường LLM nào hỗ trợ: {', '.join(sorted(needed))}")
         return eligible
 
-    async def _with_fallback(self, capability: str | None, call: Callable[[LlmEndpoint], Awaitable[T]]) -> T:
+    async def _with_fallback(self, capability: str | None, call: Callable[[LlmEndpoint], Awaitable[T]], also: Sequence[str] = ()) -> T:
         last_error: Exception | None = None
-        for endpoint in self._eligible(capability):
+        for endpoint in self._eligible(capability, also):
             try:
                 return await call(endpoint)
             except Exception as exc:

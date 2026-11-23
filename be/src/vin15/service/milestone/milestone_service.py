@@ -14,6 +14,7 @@ from vin15.domain.ports import FileStorage
 from vin15.domain.statemachine import MILESTONE, Subject
 from vin15.infrastructure.persistence.case_repository import CaseRepository
 from vin15.service.files.upload import EVIDENCE_TYPES, store_upload
+from vin15.service.milestone.evidence_check import COMPLETION_FIELDS, check_completion
 from vin15.service.milestone.milestone_view import milestone_view
 from vin15.service.notification.notification_service import NotificationService
 from vin15.service.progress.progress_calculator import EVIDENCE_REQUIRED_CODES
@@ -106,6 +107,30 @@ class MilestoneService:
             AuditEntry(actor_kind=ActorKind.HUMAN, actor_id=student.id, actor_role=student.role.value, entity="evidence", action="upload",
                        after={"milestone": code, "sha256": stored.sha256, "size": stored.size}, reason="Tải minh chứng"),
         )
+
+    def own_evidence(self, student: User, evidence_id: int) -> dict:
+        """Minh chứng của chính sinh viên, mốc chưa nộp / chưa được chấp nhận (để AI đọc hoặc xác nhận trường)."""
+        ev = self._cases.get_evidence(evidence_id)
+        if ev is None or ev["owner_id"] != student.id or not ev["storage_key"]:
+            raise ResourceNotFoundError("Không tìm thấy tệp minh chứng")
+        milestone = self._cases.milestone_by_code(ev["internship_id"], ev["milestone_code"])
+        if milestone is not None and milestone["status"] in ("submitted", "accepted"):
+            raise StateConflictError("Mốc đã nộp hoặc đã được chấp nhận, không sửa thông tin giấy")
+        return ev
+
+    def confirm_evidence_fields(self, student: User, evidence_id: int, fields: dict[str, str], confirmations: dict[str, str]) -> dict:
+        """SV xác nhận các trường đọc từ giấy xác nhận / phiếu đánh giá; BE đối chiếu với hồ sơ và lưu cảnh báo cho GV."""
+        ev = self.own_evidence(student, evidence_id)
+        clean = {k: str(v).strip()[:2000] for k, v in fields.items() if k in COMPLETION_FIELDS and str(v or "").strip()}
+        marks = {k: v for k, v in confirmations.items() if k in clean}
+        internship = self._cases.get_internship(ev["internship_id"]) or {}
+        mismatches = check_completion(clean, internship, student.full_name, student.student_code)
+        self._cases.save_evidence_extraction(
+            evidence_id, clean, marks, mismatches, student.id,
+            AuditEntry(actor_kind=ActorKind.HUMAN, actor_id=student.id, actor_role=student.role.value, entity="evidence", action="confirm_fields",
+                       after={"fields": sorted(clean), "mismatches": [m["field"] for m in mismatches]}, reason="Sinh viên xác nhận thông tin trên giấy"),
+        )
+        return {"fields": clean, "confirmations": marks, "mismatches": mismatches}
 
     def evidence_bytes(self, viewer: User, evidence_id: int) -> tuple[bytes, str, str]:
         ev = self._cases.get_evidence(evidence_id)

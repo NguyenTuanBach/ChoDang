@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { FIELD_LABEL } from "@/lib/autofill";
 import { send } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { FLAG_KIND, MODE_LABEL, fmtDate, fmtDateTime } from "@/lib/labels";
-import type { InternshipDetail, Milestone, Outline, Suggestion } from "@/lib/types";
+import type { EvidenceExtraction, InternshipDetail, Milestone, Outline, Suggestion } from "@/lib/types";
 import { Async, Badge, Button, Card, DecisionPanel, Empty, ErrorText, Field, Page, Pre, Row, StatusBadge, Table } from "@/components/ui/ui";
 import DownloadDoc from "@/components/student/DownloadDoc";
 import { FlagActions } from "./FlagsPanel";
@@ -57,15 +58,29 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
               {row.company_tax_code} · {row.company_address}
             </dd>
             <dt className="font-medium text-muted-foreground">Vị trí</dt>
-            <dd className="m-0">{row.position}</dd>
+            <dd className="m-0">
+              {row.position}
+              {row.department && ` · ${row.department}`}
+            </dd>
             <dt className="font-medium text-muted-foreground">Người hướng dẫn</dt>
             <dd className="m-0">
-              {row.mentor_name} · {row.mentor_email} · {row.mentor_phone}
+              {row.mentor_name}
+              {row.mentor_title && ` (${row.mentor_title})`} · {row.mentor_email} · {row.mentor_phone}
             </dd>
+            {(row.receipt_letter_number || row.receipt_signer_name) && (
+              <>
+                <dt className="font-medium text-muted-foreground">Giấy tiếp nhận</dt>
+                <dd className="m-0">
+                  {[row.receipt_letter_number && `Số ${row.receipt_letter_number}`, row.receipt_letter_date && `ngày ${fmtDate(row.receipt_letter_date)}`, row.receipt_signer_name && `ký: ${row.receipt_signer_name}${row.receipt_signer_title ? ` (${row.receipt_signer_title})` : ""}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </dd>
+              </>
+            )}
             <dt className="font-medium text-muted-foreground">Mô tả công việc</dt>
             <dd className="m-0 whitespace-pre-wrap break-words">{row.job_description}</dd>
           </dl>
-          {Object.values(row.field_confirmations).includes("ai_confirmed") && <p className="mb-0 mt-3"><small>Các trường do AI gợi ý và sinh viên đã xác nhận: {Object.entries(row.field_confirmations).filter(([, v]) => v === "ai_confirmed").map(([k]) => k).join(", ")}</small></p>}
+          {Object.values(row.field_confirmations).includes("ai_confirmed") && <p className="mb-0 mt-3"><small>Các trường do AI gợi ý và sinh viên đã xác nhận: {Object.entries(row.field_confirmations).filter(([, v]) => v === "ai_confirmed").map(([k]) => FIELD_LABEL[k] ?? k).join(", ")}</small></p>}
           {d.documents.map((doc) => (
             <div key={doc.id} className="mt-2">
               <DownloadDoc href={`/api/documents/${doc.id}/download`} name={doc.filename} />
@@ -326,15 +341,46 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
           )}
         </td>
       </tr>
-      {(pending || suggestions.length > 0) && (
+      {(pending || suggestions.length > 0 || latest?.extraction) && (
         <tr>
           <td colSpan={6}>
+            {latest?.extraction && <ExtractionBlock extraction={latest.extraction} />}
             <Suggestions items={suggestions} />
             {pending && <Decision pending={pending} action={action} onCancel={() => setPending(null)} />}
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+// Thông tin SV đã xác nhận từ giấy xác nhận / phiếu đánh giá (M5) và các chỗ lệch với hồ sơ mà BE phát hiện. GV vẫn cần mở tệp gốc để xác thực.
+function ExtractionBlock({ extraction }: { extraction: EvidenceExtraction }) {
+  const entries = Object.entries(extraction.fields);
+  return (
+    <div className="mb-3 rounded-lg border-2 border-beige-strong bg-background p-3 text-sm">
+      <strong>Thông tin trên giấy (sinh viên xác nhận {fmtDateTime(extraction.confirmed_at)})</strong>
+      {extraction.mismatches.length > 0 && (
+        <div className="mt-2 space-y-1" role="alert">
+          {extraction.mismatches.map((m) => (
+            <p key={m.field + m.label} className="m-0 text-red-600">
+              <strong>{m.label}</strong> — {m.detail}
+            </p>
+          ))}
+        </div>
+      )}
+      <dl className="m-0 mt-2 grid grid-cols-[11rem_1fr] gap-x-4 gap-y-1">
+        {entries.map(([key, value]) => (
+          <Fragment key={key}>
+            <dt className="text-muted-foreground">{FIELD_LABEL[key] ?? key}</dt>
+            <dd className="m-0 whitespace-pre-wrap break-words">
+              {value}
+              {extraction.confirmations[key] === "ai_confirmed" && <small className="ml-1 text-muted-foreground">(AI đọc)</small>}
+            </dd>
+          </Fragment>
+        ))}
+      </dl>
+    </div>
   );
 }
 

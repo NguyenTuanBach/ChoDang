@@ -32,3 +32,11 @@ def parse_json_object(text: str) -> dict[str, Any]:
 async def ask_json(ai: AiClient, system: str, user: str, *, max_tokens: int = 1500) -> dict[str, Any]:
     result = await ai.chat([{"role": "system", "content": system}, {"role": "user", "content": user}], temperature=0, max_tokens=max_tokens)
     return parse_json_object(result.text)
+
+
+async def ask_json_parts(ai: AiClient, system: str, parts: list[dict[str, Any]], *, max_tokens: int = 1500) -> dict[str, Any]:
+    """Như ``ask_json`` nhưng nội dung người dùng là danh sách phần (``text`` / ``image_url``); đòi đường LLM có ``vision``."""
+    result = await ai.chat(
+        [{"role": "system", "content": system}, {"role": "user", "content": parts}], temperature=0, max_tokens=max_tokens, capability="vision"
+    )
+    return parse_json_object(result.text)

@@ -29,6 +29,12 @@ PROFILE_FIELDS = (
     "start_date",
     "end_date",
     "mode",
+    "department",
+    "mentor_title",
+    "receipt_letter_number",
+    "receipt_letter_date",
+    "receipt_signer_name",
+    "receipt_signer_title",
 )
 
 _INTERNSHIP_SELECT = (
@@ -347,10 +353,14 @@ class CaseRepository:
 
     # ------------------------------------------------------------------ minh chứng ----
     def evidence_for_internship(self, internship_id: int) -> list[dict]:
+        """Kèm ``extraction`` (trường SV đã xác nhận từ giấy + cảnh báo lệch) nếu có."""
         with self._db.connection() as conn:
             return conn.execute(
                 "select e.id, e.milestone_id, m.code as milestone_code, e.title, e.filename, e.mime, e.size_bytes, e.status, "
-                "e.reviewer_comment, e.submitted_at, e.reviewed_at from evidence e join milestone m on m.id = e.milestone_id "
+                "e.reviewer_comment, e.submitted_at, e.reviewed_at, "
+                "case when x.evidence_id is null then null else jsonb_build_object('fields', x.fields, 'confirmations', x.confirmations, "
+                "'mismatches', x.mismatches, 'confirmed_at', x.confirmed_at) end as extraction "
+                "from evidence e join milestone m on m.id = e.milestone_id left join evidence_extraction x on x.evidence_id = e.id "
                 "where m.internship_id = %s order by m.code, e.id",
                 (internship_id,),
             ).fetchall()
@@ -374,6 +384,18 @@ class CaseRepository:
                 "join milestone m on m.id = e.milestone_id join internship i on i.id = m.internship_id where e.id = %s",
                 (evidence_id,),
             ).fetchone()
+
+    def save_evidence_extraction(
+        self, evidence_id: int, fields: dict[str, str], confirmations: dict[str, str], mismatches: list[dict], confirmed_by: int, audit: AuditEntry
+    ) -> None:
+        with self._db.connection() as conn:
+            conn.execute(
+                "insert into evidence_extraction (evidence_id, fields, confirmations, mismatches, confirmed_by) values (%s, %s, %s, %s, %s) "
+                "on conflict (evidence_id) do update set fields = excluded.fields, confirmations = excluded.confirmations, "
+                "mismatches = excluded.mismatches, confirmed_by = excluded.confirmed_by, confirmed_at = now()",
+                (evidence_id, Jsonb(fields), Jsonb(confirmations), Jsonb(mismatches), confirmed_by),
+            )
+            insert_audit(conn, _entity(audit, evidence_id))
 
     def count_active_evidence(self, milestone_id: int) -> int:
         with self._db.connection() as conn:

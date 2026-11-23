@@ -8,7 +8,7 @@ Có: `GET /healthz` (không token), `GET /v1/info` (cần token), `POST /v1/embe
 **trợ lý chính sách** (`WS /v1/policy-assistant/ws`, cần token ở bắt tay). `core/ai_client.py` gọi LLM: OpenAI trực tiếp, proxy AiClient dự phòng
 (chat có tool, streaming, embedding; đường dự phòng khai báo khả năng qua `AICLIENT_CAPABILITIES`, mặc định chỉ chat thường).
 Có thêm ba agent **một lượt, đầu ra cấu trúc, không có công cụ ghi** (`runtime/http/structured_agents.py`, đều cần token): chuẩn hóa hồ sơ
-`POST /v1/intake/extract` (PDF có chữ → che PII → LLM → khôi phục nhãn cục bộ), giám sát `POST /v1/monitor/review` (lệch chuẩn đầu ra, minh chứng yếu) và
+`POST /v1/intake/extract` (đọc giấy tiếp nhận / giấy xác nhận M5 / `kind=auto` tự phân loại; PDF có chữ → che PII → LLM → khôi phục nhãn; ảnh và PDF quét → model `vision`, PDF dựng ảnh bằng `pypdfium2`), giám sát `POST /v1/monitor/review` (lệch chuẩn đầu ra, minh chứng yếu) và
 tiền thẩm `POST /v1/pre-review`. BE gửi dữ liệu đã che PII, nhận kết luận rồi **tự kiểm và tự ghi** (cờ rủi ro ghi `actor_kind=agent`); agent không đổi trạng thái nào.
 Prompt: `prompts/{intake,monitor_review,pre_review}.system.md`.
 Hợp đồng khung WebSocket: `.kiro/specs/agent-hoi-dap/contract.md`; bản mã: `policy_assistant/protocol.py`.
