@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { send } from "@/lib/http";
+import { send, upload } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { fmtDate } from "@/lib/labels";
-import type { PolicyIngestResult, PolicyPreview, PolicyVersion } from "@/lib/types";
+import type { PolicyEmbedResult, PolicyExtractResult, PolicyIngestResult, PolicyPreview, PolicyVersion } from "@/lib/types";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, OkText, Page, Row, Table, type Tone } from "@/components/ui/ui";
 
 const STATUS: Record<PolicyVersion["status"], { label: string; tone: Tone }> = {
@@ -25,7 +25,7 @@ export default function PoliciesPanel() {
             list.length === 0 ? (
               <Empty>Chưa có văn bản nào.</Empty>
             ) : (
-              <Table head={["Mã", "Tên", "Phiên bản", "Hiệu lực từ", "Hiệu lực đến", "Đoạn", "Trạng thái", ""]}>
+              <Table head={["Mã", "Tên", "Phiên bản", "Hiệu lực từ", "Hiệu lực đến", "Đoạn", "Embedding", "Trạng thái", ""]}>
                 {list.map((v) => (
                   <VersionRow key={v.id} version={v} reload={state.reload} onPreview={() => setPreviewId(v.id)} />
                 ))}
@@ -47,7 +47,22 @@ export default function PoliciesPanel() {
 
 function VersionRow({ version: v, reload, onPreview }: { version: PolicyVersion; reload: () => void; onPreview: () => void }) {
   const publish = useAction(reload);
+  const embed = useAction(reload);
+  const [embedNote, setEmbedNote] = useState<string | null>(null);
   const s = STATUS[v.status];
+  const missing = v.chunk_count - v.embedded_count;
+
+  async function runEmbed() {
+    setEmbedNote(null);
+    let result: PolicyEmbedResult | undefined;
+    await embed.run(async () => {
+      result = await send<PolicyEmbedResult>("POST", `/api/admin/policies/versions/${v.id}/embed`);
+    });
+    if (!result) return;
+    const left = result.version.chunk_count - result.version.embedded_count;
+    if (!result.agent_enabled) setEmbedNote("BE chưa cấu hình agent (AGENT_API_URL): chưa tạo được embedding.");
+    else if (left > 0) setEmbedNote(`Mới tạo ${result.embedded_now} đoạn, còn thiếu ${left} (agent không chạy hoặc lỗi LLM). Thử lại sau.`);
+  }
   return (
     <tr>
       <td>{v.doc_code}</td>
@@ -58,12 +73,28 @@ function VersionRow({ version: v, reload, onPreview }: { version: PolicyVersion;
       <td className="whitespace-nowrap">{fmtDate(v.effective_from)}</td>
       <td className="whitespace-nowrap">{v.effective_to ? fmtDate(v.effective_to) : "—"}</td>
       <td>{v.chunk_count}</td>
+      <td className="whitespace-nowrap">
+        {missing <= 0 ? (
+          <Badge tone="good">Đủ</Badge>
+        ) : (
+          <span title="Đoạn chưa có embedding chỉ tìm được bằng từ khóa">
+            <Badge tone="warn">
+              {v.embedded_count}/{v.chunk_count}
+            </Badge>
+          </span>
+        )}
+      </td>
       <td>
         <Badge tone={s.tone}>{s.label}</Badge>
       </td>
       <td>
         <Row>
           <Button onClick={onPreview}>Xem</Button>
+          {missing > 0 && (
+            <Button disabled={embed.busy} onClick={() => void runEmbed()}>
+              {embed.busy ? "Đang tạo..." : "Tạo embedding"}
+            </Button>
+          )}
           {v.status === "draft" && (
             <Button
               variant="primary"
@@ -78,7 +109,8 @@ function VersionRow({ version: v, reload, onPreview }: { version: PolicyVersion;
             </Button>
           )}
         </Row>
-        <ErrorText message={publish.error} />
+        <ErrorText message={publish.error ?? embed.error} />
+        {embedNote && <p className="text-sm text-muted-foreground">{embedNote}</p>}
       </td>
     </tr>
   );
@@ -122,7 +154,26 @@ function IngestForm({ onIngested }: { onIngested: (versionId: string) => void })
   const [sample, setSample] = useState(false);
   const [text, setText] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const [fileNote, setFileNote] = useState<string | null>(null);
   const action = useAction();
+  const reading = useAction();
+
+  async function readFile(file: File | undefined) {
+    if (!file) return;
+    setFileNote(null);
+    let result: PolicyExtractResult | undefined;
+    await reading.run(async () => {
+      result = await upload<PolicyExtractResult>("/api/admin/policies/extract", file);
+    });
+    if (!result) return;
+    setText(result.text);
+    if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, ""));
+    setFileNote(
+      result.warning
+        ? `Đã đọc ${result.text.length.toLocaleString("vi-VN")} ký tự từ ${result.filename}, nhưng chưa tách được Điều/Khoản: ${result.warning}. Hãy sửa nội dung bên dưới (mỗi điều bắt đầu bằng "Điều N.").`
+        : `Đã đọc ${result.filename}: tách thử được ${result.chunk_count} đoạn. Kiểm tra nội dung bên dưới rồi bấm "Nạp và tách đoạn".`,
+    );
+  }
 
   const ready = code.trim() && title.trim() && label.trim() && from && text.trim();
 
@@ -142,7 +193,7 @@ function IngestForm({ onIngested }: { onIngested: (versionId: string) => void })
       });
     });
     if (ok && result) {
-      const embedding = result.embedded_count === 0 ? " Chưa có embedding (chỉ tìm được bằng từ khóa)." : "";
+      const embedding = result.embedded_count < result.chunk_count ? " Chưa có embedding (chỉ tìm được bằng từ khóa): bấm \"Tạo embedding\" ở bảng khi agent chạy." : "";
       setNote(`Đã tạo bản nháp: ${result.chunk_count} đoạn.${embedding}`);
       setText("");
       onIngested(result.version.id);
@@ -176,7 +227,21 @@ function IngestForm({ onIngested }: { onIngested: (versionId: string) => void })
       <label>
         <input type="checkbox" checked={sample} onChange={(e) => setSample(e.target.checked)} /> Bản mẫu (không phải quy chế thật)
       </label>
-      <Field label="Nội dung">
+      <Field label="Tải tệp quy chế (.md, .txt, .docx, .pdf có lớp chữ; tối đa 10 MB)">
+        <input
+          type="file"
+          accept=".md,.markdown,.txt,.docx,.pdf,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          disabled={reading.busy}
+          onChange={(e) => {
+            void readFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      </Field>
+      {reading.busy && <p>Đang đọc tệp...</p>}
+      <ErrorText message={reading.error} />
+      {fileNote && <p className="text-sm text-muted-foreground">{fileNote}</p>}
+      <Field label="Nội dung (đọc từ tệp hoặc dán vào)">
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={12} />
       </Field>
       <Button variant="primary" disabled={action.busy || !ready} onClick={() => void submit()}>

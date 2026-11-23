@@ -13,7 +13,7 @@ from vin15.config.container import Container
 from vin15.domain.exception import InvalidInputError
 from vin15.domain.model.policy import PolicyVersion, VersionStatus
 from vin15.main import create_app
-from vin15.service.policy.policy_ingest_service import IngestResult
+from vin15.service.policy.policy_ingest_service import EmbedResult, ExtractResult, IngestResult
 
 VERSION = PolicyVersion(7, 1, "QD-TT-01", "Quy chế", "v1", date(2026, 1, 1), None, VersionStatus.DRAFT, True, 4)
 BODY = {
@@ -35,6 +35,16 @@ class FakeIngest:
         if "LỖI" in kwargs["text"]:
             raise InvalidInputError('Không tìm thấy "Điều N."')
         return IngestResult(VERSION, 4, 4, True)
+
+    def extract(self, filename, data):
+        self.calls.append({"extract": filename, "size": len(data)})
+        if filename.endswith(".exe"):
+            raise InvalidInputError("Chỉ nhận tệp .md, .txt, .docx, .pdf")
+        return ExtractResult(data.decode(), 1, None)
+
+    async def embed_version(self, version_id):
+        self.calls.append({"embed": version_id})
+        return EmbedResult(PolicyVersion(7, 1, "QD-TT-01", "Quy chế", "v1", date(2026, 1, 1), None, VersionStatus.DRAFT, True, 4, 4), 3, True)
 
 
 class FakePublish:
@@ -77,6 +87,8 @@ def test_only_admin_may_manage_policies(client, container, user):
     assert client.post("/api/admin/policies", json=BODY, headers=headers).status_code == 403
     assert client.get("/api/admin/policies/versions/7", headers=headers).status_code == 403
     assert client.post("/api/admin/policies/versions/7/publish", headers=headers).status_code == 403
+    assert client.post("/api/admin/policies/extract", files={"file": ("q.md", b"x")}, headers=headers).status_code == 403
+    assert client.post("/api/admin/policies/versions/7/embed", headers=headers).status_code == 403
     assert container.policy_ingest_service.calls == [] and container.policy_publish_service.published == []
 
 
@@ -112,3 +124,28 @@ def test_body_validation(client, container):
         client.post("/api/admin/policies", json={k: v for k, v in BODY.items() if k != "effective_from"}, headers=headers).status_code
         == 422
     )
+
+
+def test_extract_returns_text_without_saving(client, container):
+    headers = as_user(container, ADMIN)
+    response = client.post("/api/admin/policies/extract", files={"file": ("quy-che.md", "Điều 1. A\nnội dung".encode())}, headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"filename": "quy-che.md", "text": "Điều 1. A\nnội dung", "chunk_count": 1, "warning": None}
+    bad = client.post("/api/admin/policies/extract", files={"file": ("x.exe", b"MZ")}, headers=headers)
+    assert bad.status_code == 422 and bad.json()["error"] == "invalid_input"
+
+
+def test_extract_rejects_oversized_file(client, container):
+    from vin15.service.policy.policy_file_reader import MAX_FILE_BYTES
+
+    big = b"a" * (MAX_FILE_BYTES + 1)
+    response = client.post("/api/admin/policies/extract", files={"file": ("q.txt", big)}, headers=as_user(container, ADMIN))
+    assert response.status_code == 422 and not any("extract" in c for c in container.policy_ingest_service.calls)
+
+
+def test_embed_version(client, container):
+    response = client.post("/api/admin/policies/versions/7/embed", headers=as_user(container, ADMIN))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["embedded_now"] == 3 and body["agent_enabled"] is True and body["version"]["embedded_count"] == 4
+    assert {"embed": 7} in container.policy_ingest_service.calls

@@ -24,6 +24,8 @@ dependencies = [
     "websockets>=13",
     # Lưu tệp minh chứng lên Cloudflare R2 (API tương thích S3).
     "boto3>=1.34",
+    # Đọc văn bản từ tệp quy chế PDF tải lên (thuần Python). DOCX đọc bằng zipfile + xml của thư viện chuẩn.
+    "pypdf>=5",
 ]
 
 [project.scripts]

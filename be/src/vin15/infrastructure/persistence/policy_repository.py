@@ -116,6 +116,7 @@ def _to_version(row: dict) -> PolicyVersion:
         status=VersionStatus(row["status"]),
         is_sample=row["is_sample"],
         chunk_count=row.get("chunk_count", 0),
+        embedded_count=row.get("embedded_count", 0),
     )
 
 
@@ -126,7 +127,8 @@ def vector_literal(vector: Sequence[float]) -> str:
 
 _VERSION_SELECT = (
     "select v.id, v.document_id, v.version_label, v.effective_from, v.effective_to, v.status, v.is_sample, "
-    "d.code as doc_code, d.title as doc_title, (select count(*) from policy_chunk c where c.version_id = v.id) as chunk_count "
+    "d.code as doc_code, d.title as doc_title, (select count(*) from policy_chunk c where c.version_id = v.id) as chunk_count, "
+    "(select count(*) from policy_chunk c where c.version_id = v.id and c.embedding is not null) as embedded_count "
     "from policy_version v join policy_document d on d.id = v.document_id"
 )
 

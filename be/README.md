@@ -49,7 +49,7 @@ Hướng phụ thuộc (kiểm bởi `tests/test_architecture.py`):
 | `POST /api/agent-tools/policy/search`, `GET /api/agent-tools/policy/chunks/{id}` | Tool tra quy định đang hiệu lực (agent gọi; service token + `X-On-Behalf-Of`) |
 | `GET /api/agent-tools/me/{internship,milestones,progress,credit-checklist,requests}` | Tool cá nhân chỉ-đọc, chủ thể do BE quyết; chỉ sinh viên. Lỗi theo hợp đồng `{"error":{"code","message"}}` |
 | `GET /api/agent-tools/staff/{queue,flags,dashboard,internships}` | Tool dữ liệu chỉ-đọc cho giảng viên/quản trị viên; phạm vi (GV: sinh viên mình phụ trách, QTV: toàn bộ) do BE quyết từ agent-token, tối đa 30 mục, không email/SĐT/MST; sinh viên → 403 `forbidden_role` |
-| `GET/POST /api/admin/policies…` | Quản trị viên: nạp văn bản (tách Điều/Khoản, bản nháp), xem trước, xuất bản |
+| `GET/POST /api/admin/policies…` | Quản trị viên: nạp văn bản (tách Điều/Khoản, bản nháp), xem trước, xuất bản; `POST …/extract` đọc chữ từ tệp .md/.txt/.docx/.pdf (không lưu); `POST …/versions/{id}/embed` bù embedding còn thiếu |
 | `/api/auth/{me,logout,providers,google/login,google/callback}`, `/api/auth/dev-*` | Phiên cookie; Google OAuth (chỉ email đã mời); đăng nhập dev (ngoài production) |
 | `/api/invitations…`, `/api/lecturers`, `/api/students/{id}/{advisor,code}` | Mời GV (QTV) / SV (GV, QTV), thu hồi, mời lại, gán GV phụ trách, mã sinh viên |
 | `/api/student/internship…`, `/api/documents/{id}/download` | SV: hồ sơ, giấy tiếp nhận, AI gợi ý trường, kiểm trước khi nộp, nộp, nộp kết thúc |
@@ -69,7 +69,7 @@ Hợp đồng chi tiết: `.kiro/specs/agent-hoi-dap/contract.md`. Mọi `/api/a
 request không có agent-token và cho `ws-ticket` khi không có token phiên. `make seed-dev` (từ chối khi `APP_ENV=production`, chạy lại được) tạo
 QTV `qtv@example.test`, GV `gv@example.test`, SV A `sv.a@example.test` (trễ mốc M3, thiếu nhật ký), SV B `sv.b@example.test` (đã nộp báo cáo cuối),
 SV C `sv.c@example.test` (chưa có hồ sơ) và bộ quy chế mẫu `is_sample=true` (`resources/seed/policies/*.md`). Có `AGENT_API_URL` và agent chạy thì
-seed xin embedding qua agent; không thì quy chế chỉ tìm bằng từ khóa (chạy lại seed khi agent sẵn sàng để bù embedding).
+seed xin embedding qua agent; không thì quy chế chỉ tìm bằng từ khóa (chạy lại seed, hoặc bấm "Tạo embedding" ở `/admin/policies`, khi agent sẵn sàng để bù embedding).
 
 ## Test
 `uv run pytest`: test đơn vị/HTTP/WebSocket không cần mạng ngoài (agent giả là WebSocket server trên localhost). Test tích hợp V1 dùng Postgres nhúng

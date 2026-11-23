@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 
 from vin15.config.container import Container
-from vin15.domain.exception import ResourceNotFoundError
+from vin15.domain.exception import InvalidInputError, ResourceNotFoundError
 from vin15.domain.model.user import User
 from vin15.presentation.dto.policy_admin import (
     PolicyChunkPreview,
+    PolicyEmbedResponse,
+    PolicyExtractResponse,
     PolicyIngestRequest,
     PolicyIngestResponse,
     PolicyPreviewResponse,
     PolicyVersionDto,
 )
+
+from vin15.service.policy.policy_file_reader import MAX_FILE_BYTES
 
 from .dependencies import admin_user, container
 
@@ -42,6 +46,24 @@ async def ingest_policy(
     return PolicyIngestResponse(
         version=PolicyVersionDto.of(result.version), chunk_count=result.chunk_count, embedded_count=result.embedded_count
     )
+
+
+@router.post("/extract", response_model=PolicyExtractResponse, summary="Đọc chữ từ tệp quy chế (.md, .txt, .docx, .pdf), không lưu")
+def extract_policy_file(
+    file: UploadFile = File(...), _admin: User = Depends(admin_user), app: Container = Depends(container)
+) -> PolicyExtractResponse:
+    data = file.file.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        raise InvalidInputError(f"Tệp vượt quá {MAX_FILE_BYTES // (1024 * 1024)} MB")
+    filename = file.filename or ""
+    result = app.policy_ingest_service.extract(filename, data)
+    return PolicyExtractResponse(filename=filename, text=result.text, chunk_count=result.chunk_count, warning=result.warning)
+
+
+@router.post("/versions/{version_id}/embed", response_model=PolicyEmbedResponse, summary="Tạo embedding cho các đoạn còn thiếu")
+async def embed_version(version_id: int, _admin: User = Depends(admin_user), app: Container = Depends(container)) -> PolicyEmbedResponse:
+    result = await app.policy_ingest_service.embed_version(version_id)
+    return PolicyEmbedResponse(version=PolicyVersionDto.of(result.version), embedded_now=result.embedded_now, agent_enabled=result.agent_enabled)
 
 
 @router.get("/versions/{version_id}", response_model=PolicyPreviewResponse, summary="Xem trước các đoạn đã tách")

@@ -8,12 +8,13 @@ from datetime import date
 
 import anyio.to_thread
 
-from vin15.domain.exception import AgentUnavailableError, StateConflictError
+from vin15.domain.exception import AgentUnavailableError, InvalidInputError, ResourceNotFoundError, StateConflictError
 from vin15.domain.model.policy import PolicyVersion
 from vin15.infrastructure.agent_api import AgentApiClient
 from vin15.infrastructure.persistence.policy_repository import PolicyRepository
 
 from .policy_chunker import PolicyChunker
+from .policy_file_reader import read_policy_file
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +30,24 @@ class IngestResult:
     embedded_count: int
     #: ``True`` nếu đã tạo phiên bản mới; ``False`` nếu phiên bản đã có (chạy lại, không ghi đè).
     created: bool
+
+
+@dataclass(frozen=True)
+class ExtractResult:
+    """Văn bản đọc từ tệp tải lên (chưa lưu gì). ``chunk_count`` = số đoạn tách thử; 0 kèm ``warning`` nếu chưa đúng cấu trúc."""
+
+    text: str
+    chunk_count: int
+    warning: str | None
+
+
+@dataclass(frozen=True)
+class EmbedResult:
+    version: PolicyVersion
+    #: Số đoạn vừa được tạo embedding ở lần gọi này.
+    embedded_now: int
+    #: ``False`` nếu BE không cấu hình agent (không tạo được embedding).
+    agent_enabled: bool
 
 
 class PolicyIngestService:
@@ -65,6 +84,23 @@ class PolicyIngestService:
         )
         embedded = await self.embed_missing(version.id)
         return IngestResult(version, len(drafts), embedded, created=True)
+
+    def extract(self, filename: str, data: bytes) -> ExtractResult:
+        """Đọc chữ từ tệp quy chế và tách thử Điều/Khoản (không lưu). Sai cấu trúc vẫn trả văn bản để quản trị viên sửa tay."""
+        text = read_policy_file(filename, data)
+        try:
+            return ExtractResult(text, len(self._chunker.chunk(text)), None)
+        except InvalidInputError as error:
+            return ExtractResult(text, 0, str(error))
+
+    async def embed_version(self, version_id: int) -> EmbedResult:
+        """Bù embedding còn thiếu của một phiên bản (nút "Tạo embedding" ở trang quản trị; cũng dùng sau khi agent hết lỗi)."""
+        if await anyio.to_thread.run_sync(lambda: self._repo.get_version(version_id)) is None:
+            raise ResourceNotFoundError("Không tìm thấy phiên bản văn bản")
+        embedded = await self.embed_missing(version_id)
+        version = await anyio.to_thread.run_sync(lambda: self._repo.get_version(version_id))
+        assert version is not None
+        return EmbedResult(version, embedded, self._agent.enabled)
 
     async def ensure(self, **kwargs) -> IngestResult:
         """Như :meth:`ingest` nhưng chạy lại được: phiên bản đã có thì không tạo lại, chỉ bù embedding còn thiếu."""

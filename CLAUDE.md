@@ -29,8 +29,12 @@ Có **khung** và **một tính năng đầu tiên: Trợ lý chính sách** (k�
 - **Có thêm**: trang FE quản trị quy định `/admin/policies` (nạp → xem trước → xuất bản; chưa chạy thử trên trình duyệt).
 - **Có thêm (chưa chạy thử, xem `docs/changes/20261122-tro-ly-theo-vai-tro.md`)**: Trợ lý tách theo vai trò: prompt + văn phong riêng cho SV/GV/QTV (`agent/prompts/persona.*.md`), tool dữ liệu `staff/*` cho GV/QTV (BE kiểm phạm vi).
 - **Có thêm (chưa mở trên trình duyệt, xem `docs/changes/20261122-ui-lms-va-side-chat.md`)**: UI kiểu LMS bằng shadcn/ui (sidebar + thanh trên, route group `fe/src/app/(app)`, `AuthProvider` + `RoleGuard`), ngăn Trợ lý nổi dùng chung một phiên chat qua các trang (`AssistantProvider`/`AssistantDock`, `Ctrl+J`), tool `navigate_to` để điều hướng bằng lời (`policy_assistant/pages.json` ↔ `fe/src/lib/nav.ts`), trang chủ 3 vai trò.
+- **Có thêm (chưa chạy test, xem `docs/changes/20261123-tro-ly-dieu-huong-nang-cao.md`)**: Trợ lý biết trang đang mở (`ask.page` → `start.current_page`),
+  mở được trang chi tiết hồ sơ (`internship_detail` + `internship_id` lấy từ `list_internships(student=…)`) và mở trang kèm bộ lọc (`filters` → query string; hàng chờ, hồ sơ, cờ rủi ro).
+- **Có thêm (chưa chạy test, xem `docs/changes/20261123-tai-tep-quy-che-va-embedding.md`)**: `/admin/policies` tải tệp quy chế (.md/.txt/.docx/.pdf có lớp chữ → điền ô nội dung để sửa rồi nạp),
+  cột Embedding + nút "Tạo embedding" bù phần còn thiếu.
 - **Chưa có**: danh sách thu hồi token bền (đang ở RAM), adapter LMS thật (Moodle...); quy chế trong DB là **bản mẫu**.
-- **Còn dở**: embedding quy chế (chạy lại `make seed-dev` khi agent gọi được OpenAI); lượt hỏi cá nhân đôi khi không gọi `get_my_*`; chưa chạy eval LLM thật; tool `get_my_*` của Trợ lý chưa trả thêm trạng thái đề cương.
+- **Còn dở**: embedding quy chế (chạy lại `make seed-dev` hoặc bấm "Tạo embedding" ở `/admin/policies` khi agent gọi được OpenAI); lượt hỏi cá nhân đôi khi không gọi `get_my_*`; chưa chạy eval LLM thật; tool `get_my_*` của Trợ lý chưa trả thêm trạng thái đề cương.
 - **Thứ tự làm tiếp**: smoke test nốt luồng còn lại + FE → `make test`/lint/tsc và sửa lỗi → viết test cho phần mới → embedding quy chế + `make agent-eval` → LMS thật khi biết hệ thống của trường → quy chế thật (R1).
 
 ## Current Invariants (để không drift)

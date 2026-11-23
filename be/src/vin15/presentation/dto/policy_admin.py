@@ -28,6 +28,8 @@ class PolicyVersionDto(BaseModel):
     status: str
     is_sample: bool
     chunk_count: int
+    #: Số đoạn đã có embedding; nhỏ hơn ``chunk_count`` thì phần còn lại chỉ tìm được bằng từ khóa.
+    embedded_count: int
 
     @classmethod
     def of(cls, version: PolicyVersion) -> PolicyVersionDto:
@@ -41,6 +43,7 @@ class PolicyVersionDto(BaseModel):
             status=version.status.value,
             is_sample=version.is_sample,
             chunk_count=version.chunk_count,
+            embedded_count=version.embedded_count,
         )
 
 
@@ -66,3 +69,19 @@ class PolicyChunkPreview(BaseModel):
 class PolicyPreviewResponse(BaseModel):
     version: PolicyVersionDto
     chunks: list[PolicyChunkPreview]
+
+
+class PolicyExtractResponse(BaseModel):
+    """Văn bản đọc từ tệp tải lên (chưa lưu): FE điền vào ô "Nội dung" để quản trị viên xem/sửa rồi mới nạp."""
+
+    filename: str
+    text: str
+    #: Số đoạn tách thử được; 0 thì xem ``warning`` (chưa đúng cấu trúc "Điều N." / "Khoản M.").
+    chunk_count: int
+    warning: str | None
+
+
+class PolicyEmbedResponse(BaseModel):
+    version: PolicyVersionDto
+    embedded_now: int
+    agent_enabled: bool

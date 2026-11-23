@@ -261,8 +261,11 @@ export type PolicyVersion = {
   status: "draft" | "published" | "superseded";
   is_sample: boolean;
   chunk_count: number;
+  embedded_count: number; // < chunk_count: phần còn lại chỉ tìm được bằng từ khóa
 };
 
 export type PolicyChunk = { chunk_id: string; article_no: string; clause_no: string | null; heading: string; text: string };
 export type PolicyPreview = { version: PolicyVersion; chunks: PolicyChunk[] };
 export type PolicyIngestResult = { version: PolicyVersion; chunk_count: number; embedded_count: number };
+export type PolicyExtractResult = { filename: string; text: string; chunk_count: number; warning: string | null };
+export type PolicyEmbedResult = { version: PolicyVersion; embedded_now: number; agent_enabled: boolean };

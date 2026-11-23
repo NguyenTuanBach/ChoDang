@@ -36,6 +36,8 @@ class PolicyVersion:
     status: VersionStatus
     is_sample: bool
     chunk_count: int = 0
+    #: Số đoạn đã có embedding (còn thiếu thì đoạn đó chỉ tìm được bằng từ khóa).
+    embedded_count: int = 0
 
 
 @dataclass(frozen=True)
