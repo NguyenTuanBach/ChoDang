@@ -252,7 +252,7 @@ class Container:
 
     @cached_property
     def intake_service(self) -> IntakeService:
-        return IntakeService(self.case_repository, self.file_storage, self.agent_client)
+        return IntakeService(self.case_repository, self.file_storage, self.agent_client, self.internship_service, self.milestone_service)
 
     @cached_property
     def outline_service(self) -> OutlineService:

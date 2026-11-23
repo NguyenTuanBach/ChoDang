@@ -22,7 +22,7 @@ Có **khung** và **một tính năng đầu tiên: Trợ lý chính sách** (k�
 - **Có thêm**: đăng nhập dev (`/login` → nút "Đăng nhập dev", `POST /api/auth/dev-login`, cookie phiên HttpOnly; chỉ ngoài production), `GET /api/auth/me`, `POST /api/auth/logout`.
 - **Có thêm (nghiệp vụ thực tập, xem `docs/changes/20261121-nghiep-vu-thuc-tap.md`)**: state machine (`domain/statemachine`), phân quyền theo vai trò và phạm vi,
   mời tài khoản + Google OAuth, hồ sơ (AI gợi ý trường), đề cương, mốc/nhật ký/minh chứng (R2), gia hạn/ngoại lệ, thẩm định → phê duyệt tín chỉ, **LMS mini** (`infrastructure/lms`, sau `LmsPort`),
-  dashboard + CSV + audit, thông báo + email, job nền, giám sát + tiền thẩm (agent một-lượt không công cụ ghi), FE theo vai trò (`/student`, `/lecturer`, `/admin`). Migration `V5`–`V10`.
+  dashboard + CSV + audit, thông báo + email, job nền, giám sát + tiền thẩm (agent một-lượt không công cụ ghi), FE theo vai trò (`/student`, `/lecturer`, `/admin`). Migration `V5`–`V10` (V12: tự điền giấy tờ; V11 `journal_standup` đã áp trên DB chung nhưng không có file ở nhánh này).
 - **Đã smoke test thủ công (2026-11-21)**: BE + agent chạy được; GET theo vai trò, RBAC, luồng hồ sơ draft→submitted→confirmed, chat Trợ lý (LLM thật) đều đạt.
   **Chưa**: đề cương → mốc → thẩm định → tín chỉ → LMS sync, `pre-review`, upload tệp, mời/OAuth/email, job nền, FE; **chưa có test tự động cho phần mới** và `pytest`/`vitest`/lint chưa chạy. Chi tiết ở `docs/changes/20261121-nghiep-vu-thuc-tap.md`.
 - **Có thêm**: giao diện Tailwind (khung menu, đăng nhập, Tổng quan sinh viên có thanh hành trình, hàng chờ GV/QTV dạng thẻ; thiết kế ở `docs/thiet-ke-screen-flow.md`, chưa làm wizard hồ sơ/duyệt hai cột/ngăn Trợ lý nổi).
@@ -33,6 +33,9 @@ Có **khung** và **một tính năng đầu tiên: Trợ lý chính sách** (k�
   mở được trang chi tiết hồ sơ (`internship_detail` + `internship_id` lấy từ `list_internships(student=…)`) và mở trang kèm bộ lọc (`filters` → query string; hàng chờ, hồ sơ, cờ rủi ro).
 - **Có thêm (chưa chạy test, xem `docs/changes/20261123-tai-tep-quy-che-va-embedding.md`)**: `/admin/policies` tải tệp quy chế (.md/.txt/.docx/.pdf có lớp chữ → điền ô nội dung để sửa rồi nạp),
   cột Embedding + nút "Tạo embedding" bù phần còn thiếu.
+- **Có thêm (BE đã smoke test với LLM thật, FE chưa mở; xem `docs/changes/20261123-ai-doc-giay-to-tu-dien.md`)**: AI đọc giấy tờ để tự điền — cả ảnh chụp/PDF scan (model vision, **không cờ**, đã chốt):
+  giấy tiếp nhận → form hồ sơ (thêm phòng ban, chức vụ người hướng dẫn, số/ngày/người ký giấy); giấy xác nhận/phiếu đánh giá M5 → trường + đối chiếu hồ sơ (`evidence_extraction`, V12);
+  hỏi "có muốn AI tự điền" sau khi tải; nút 📎 trong ngăn Trợ lý (SV) → thẻ gợi ý → mở trang đúng, điền nháp, nút lưu/xác nhận nhấp nháy.
 - **Chưa có**: danh sách thu hồi token bền (đang ở RAM), adapter LMS thật (Moodle...); quy chế trong DB là **bản mẫu**.
 - **Còn dở**: embedding quy chế (chạy lại `make seed-dev` hoặc bấm "Tạo embedding" ở `/admin/policies` khi agent gọi được OpenAI); lượt hỏi cá nhân đôi khi không gọi `get_my_*`; chưa chạy eval LLM thật; tool `get_my_*` của Trợ lý chưa trả thêm trạng thái đề cương.
 - **Thứ tự làm tiếp**: smoke test nốt luồng còn lại + FE → `make test`/lint/tsc và sửa lỗi → viết test cho phần mới → embedding quy chế + `make agent-eval` → LMS thật khi biết hệ thống của trường → quy chế thật (R1).

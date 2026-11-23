@@ -53,6 +53,7 @@ Hướng phụ thuộc (kiểm bởi `tests/test_architecture.py`):
 | `/api/auth/{me,logout,providers,google/login,google/callback}`, `/api/auth/dev-*` | Phiên cookie; Google OAuth (chỉ email đã mời); đăng nhập dev (ngoài production) |
 | `/api/invitations…`, `/api/lecturers`, `/api/students/{id}/{advisor,code}` | Mời GV (QTV) / SV (GV, QTV), thu hồi, mời lại, gán GV phụ trách, mã sinh viên |
 | `/api/student/internship…`, `/api/documents/{id}/download` | SV: hồ sơ, giấy tiếp nhận, AI gợi ý trường, kiểm trước khi nộp, nộp, nộp kết thúc |
+| `POST /api/student/intake/auto`, `POST /api/student/evidence/{id}/extract`, `PUT /api/student/evidence/{id}/fields` | SV: đính kèm giấy trong Trợ lý (AI nhận loại giấy, BE lưu vào hồ sơ hoặc minh chứng M5, trả gợi ý); AI đọc giấy xác nhận M5; SV xác nhận trường, BE đối chiếu với hồ sơ (`evidence_extraction`, V12) |
 | `/api/internships…`, `/api/queue`, `/api/internships/export.csv` | GV/QTV: danh sách có lọc, chi tiết, quyết định hồ sơ, tiền thẩm AI, hàng chờ, xuất CSV |
 | `/api/student/outlines`, `/api/outlines/{id}/decision` | Đề cương (phiên bản) và quyết định của GV |
 | `/api/student/milestones/{code}/{submit,evidence}`, `/api/milestones/{id}/{accept,reject}`, `/api/student/journal`, `/api/journal/{id}/comment`, `/api/evidence/{id}/download` | Mốc, minh chứng (kiểm loại tệp thật), nhật ký tuần |

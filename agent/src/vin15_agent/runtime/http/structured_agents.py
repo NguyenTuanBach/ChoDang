@@ -8,7 +8,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -30,7 +30,8 @@ class IntakeRequest(BaseModel):
     filename: str = Field(max_length=200)
     mime: str = Field(max_length=100)
     content_b64: str
-    fields: list[str] = Field(max_length=20)
+    fields: list[str] = Field(default_factory=list, max_length=30)
+    kind: Literal["receipt_letter", "completion_letter", "auto"] = "receipt_letter"
 
 
 def register_structured_agents(app: FastAPI, *, settings: Settings, ai: AiClient, require_service_token, prompts: PromptLoader | None = None) -> None:
@@ -55,7 +56,7 @@ def register_structured_agents(app: FastAPI, *, settings: Settings, ai: AiClient
             raise HTTPException(status_code=422, detail="content_b64 không hợp lệ") from exc
         if len(data) > MAX_FILE_BYTES:
             raise HTTPException(status_code=413, detail="Tệp quá lớn")
-        return await guarded(intake.extract(body.mime, data, body.fields))
+        return await guarded(intake.extract(body.mime, data, body.fields, body.kind))
 
     @app.post("/v1/monitor/review", dependencies=[Depends(require_service_token)])
     async def monitor_review(body: dict[str, Any]) -> dict:

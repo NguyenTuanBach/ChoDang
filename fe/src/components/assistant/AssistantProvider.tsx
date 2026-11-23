@@ -3,6 +3,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAssistant, type AssistantApi, type AssistantOptions } from "@/lib/assistant/useAssistant";
+import { setPendingAutofill, type AutofillResult } from "@/lib/autofill";
+import { messageOf, upload } from "@/lib/http";
 import { currentPageRef, pageHref } from "@/lib/nav";
 import { useCurrentUser } from "@/lib/user-context";
 
@@ -15,7 +17,14 @@ export interface AssistantContextValue {
   toggle: () => void;
   // Mở ngăn rồi gửi câu hỏi (dùng cho câu hỏi gợi ý ở trang khác).
   askInDock: (question: string) => void;
+  // Đính kèm giấy (chỉ sinh viên): AI nhận loại giấy, BE lưu vào đúng chỗ; FE chuyển sang trang cần thiết và điền nháp ở đó.
+  canAttach: boolean;
+  attachDocument: (file: File) => void;
+  autofillCards: AutofillCardItem[];
+  dismissAutofillCard: (id: number) => void;
 }
+
+export type AutofillCardItem = { id: number; filename: string; status: "reading" | "done" | "error"; result?: AutofillResult; error?: string; href?: string };
 
 const AssistantContext = createContext<AssistantContextValue | null>(null);
 
@@ -52,6 +61,34 @@ export default function AssistantProvider({ children, options }: { children: Rea
   // Provider chỉ dựng sau khi đã biết người dùng (phía trình duyệt), nên đọc localStorage ngay khi khởi tạo là an toàn.
   const [open, setOpenState] = useState(readOpen);
   const executed = useRef(new Set<string>());
+  const [autofillCards, setAutofillCards] = useState<AutofillCardItem[]>([]);
+  const cardSeq = useRef(0);
+  const canAttach = user.role === "student";
+
+  // Không qua WebSocket/LLM hội thoại: gọi thẳng BE (BE gọi agent đọc giấy). Kết quả chỉ là gợi ý, chưa lưu vào hồ sơ.
+  const attachDocument = useCallback(
+    (file: File) => {
+      if (!canAttach) return;
+      const id = ++cardSeq.current;
+      setAutofillCards((cards) => [...cards, { id, filename: file.name, status: "reading" }]);
+      void (async () => {
+        try {
+          const result = await upload<AutofillResult>("/api/student/intake/auto", file);
+          const target = pageHref(user.role, result.target_page);
+          setAutofillCards((cards) => cards.map((c) => (c.id === id ? { ...c, status: "done", result, href: target?.href } : c)));
+          setPendingAutofill({ kind: result.kind, documentId: result.document_id, evidenceId: result.evidence_id, fields: result.fields, warnings: result.warnings ?? [] });
+          if (target) {
+            setOpenState(true); // từ /assistant sang trang khác: vẫn thấy thẻ ở ngăn Trợ lý
+            router.push(target.href);
+          }
+        } catch (error) {
+          setAutofillCards((cards) => cards.map((c) => (c.id === id ? { ...c, status: "error", error: messageOf(error) } : c)));
+        }
+      })();
+    },
+    [canAttach, user.role, router],
+  );
+  const dismissAutofillCard = useCallback((id: number) => setAutofillCards((cards) => cards.filter((c) => c.id !== id)), []);
 
   const setOpen = useCallback((next: boolean) => {
     setOpenState(next);
@@ -96,6 +133,9 @@ export default function AssistantProvider({ children, options }: { children: Rea
     return () => window.removeEventListener("keydown", onKey);
   }, [toggle]);
 
-  const value = useMemo(() => ({ assistant, open, setOpen, toggle, askInDock }), [assistant, open, setOpen, toggle, askInDock]);
+  const value = useMemo(
+    () => ({ assistant, open, setOpen, toggle, askInDock, canAttach, attachDocument, autofillCards, dismissAutofillCard }),
+    [assistant, open, setOpen, toggle, askInDock, canAttach, attachDocument, autofillCards, dismissAutofillCard],
+  );
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>;
 }

@@ -16,6 +16,12 @@ export type Internship = {
   mentor_email: string;
   mentor_phone: string;
   job_description: string;
+  department: string;
+  mentor_title: string;
+  receipt_letter_number: string;
+  receipt_letter_date: string | null;
+  receipt_signer_name: string;
+  receipt_signer_title: string;
   field_confirmations: Record<string, string>;
   version: number;
   decision_reason: string;
@@ -69,6 +75,16 @@ export type Evidence = {
   reviewer_comment: string;
   submitted_at: string;
   reviewed_at: string | null;
+  // Trường SV đã xác nhận từ giấy xác nhận / phiếu đánh giá (M5) và cảnh báo lệch với hồ sơ (BE tính).
+  extraction: EvidenceExtraction | null;
+};
+
+export type EvidenceMismatch = { field: string; label: string; detail: string };
+export type EvidenceExtraction = {
+  fields: Record<string, string>;
+  confirmations: Record<string, string>;
+  mismatches: EvidenceMismatch[];
+  confirmed_at: string;
 };
 
 export type Attachment = { id: number; filename: string; mime: string; size_bytes: number };
