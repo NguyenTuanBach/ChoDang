@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAssistant, type AssistantApi, type AssistantOptions } from "@/lib/assistant/useAssistant";
-import { setPendingAutofill, type AutofillResult } from "@/lib/autofill";
+import { setPendingAutofill, toPending, type AutofillResult } from "@/lib/autofill";
 import { messageOf, upload } from "@/lib/http";
 import { currentPageRef, pageHref } from "@/lib/nav";
 import { useCurrentUser } from "@/lib/user-context";
@@ -21,6 +21,8 @@ export interface AssistantContextValue {
   canAttach: boolean;
   attachDocument: (file: File) => void;
   autofillCards: AutofillCardItem[];
+  // Điền lại gợi ý của một thẻ vào trang đích (gợi ý chỉ được trang lấy một lần, nên bấm lại khi trang đã trống hoặc mở lại).
+  reapplyAutofill: (id: number) => void;
   dismissAutofillCard: (id: number) => void;
 }
 
@@ -63,6 +65,10 @@ export default function AssistantProvider({ children, options }: { children: Rea
   const executed = useRef(new Set<string>());
   const [autofillCards, setAutofillCards] = useState<AutofillCardItem[]>([]);
   const cardSeq = useRef(0);
+  const cardsRef = useRef<AutofillCardItem[]>([]);
+  useEffect(() => {
+    cardsRef.current = autofillCards;
+  }, [autofillCards]);
   const canAttach = user.role === "student";
 
   // Không qua WebSocket/LLM hội thoại: gọi thẳng BE (BE gọi agent đọc giấy). Kết quả chỉ là gợi ý, chưa lưu vào hồ sơ.
@@ -76,7 +82,7 @@ export default function AssistantProvider({ children, options }: { children: Rea
           const result = await upload<AutofillResult>("/api/student/intake/auto", file);
           const target = pageHref(user.role, result.target_page);
           setAutofillCards((cards) => cards.map((c) => (c.id === id ? { ...c, status: "done", result, href: target?.href } : c)));
-          setPendingAutofill({ kind: result.kind, documentId: result.document_id, evidenceId: result.evidence_id, fields: result.fields, warnings: result.warnings ?? [] });
+          setPendingAutofill(toPending(result));
           if (target) {
             setOpenState(true); // từ /assistant sang trang khác: vẫn thấy thẻ ở ngăn Trợ lý
             router.push(target.href);
@@ -88,6 +94,10 @@ export default function AssistantProvider({ children, options }: { children: Rea
     },
     [canAttach, user.role, router],
   );
+  const reapplyAutofill = useCallback((id: number) => {
+    const card = cardsRef.current.find((c) => c.id === id);
+    if (card?.status === "done" && card.result) setPendingAutofill(toPending(card.result));
+  }, []);
   const dismissAutofillCard = useCallback((id: number) => setAutofillCards((cards) => cards.filter((c) => c.id !== id)), []);
 
   const setOpen = useCallback((next: boolean) => {
@@ -116,6 +126,9 @@ export default function AssistantProvider({ children, options }: { children: Rea
       for (const action of turn.actions) {
         if (action.type !== "navigate") continue;
         const target = pageHref(user.role, action.page, { internshipId: action.internship_id, filters: action.filters });
+        // Trợ lý mở trang mà trong chat đang có thẻ đọc giấy cho đúng trang đó (vd "tự điền vào trang đề cương"): điền gợi ý vào trang.
+        const card = [...cardsRef.current].reverse().find((c) => c.status === "done" && c.result?.target_page === action.page);
+        if (card?.result) setPendingAutofill(toPending(card.result));
         if (target) router.push(target.href);
       }
     }
@@ -134,8 +147,8 @@ export default function AssistantProvider({ children, options }: { children: Rea
   }, [toggle]);
 
   const value = useMemo(
-    () => ({ assistant, open, setOpen, toggle, askInDock, canAttach, attachDocument, autofillCards, dismissAutofillCard }),
-    [assistant, open, setOpen, toggle, askInDock, canAttach, attachDocument, autofillCards, dismissAutofillCard],
+    () => ({ assistant, open, setOpen, toggle, askInDock, canAttach, attachDocument, autofillCards, dismissAutofillCard, reapplyAutofill }),
+    [assistant, open, setOpen, toggle, askInDock, canAttach, attachDocument, autofillCards, dismissAutofillCard, reapplyAutofill],
   );
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>;
 }

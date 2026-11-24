@@ -10,6 +10,7 @@ import { fmtDate, fmtDateTime } from "@/lib/labels";
 import type { InternshipDetail, Milestone } from "@/lib/types";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, Page, Row, StatusBadge } from "@/components/ui/ui";
 import { cn } from "@/lib/utils";
+import NoticeCard from "@/components/ui/notice-card";
 import EvidenceFieldsForm from "./EvidenceFieldsForm";
 import EvidencePreviewDialog from "./EvidencePreviewDialog";
 
@@ -52,14 +53,6 @@ export default function MilestonesPage() {
       </Async>
     </Page>
   );
-}
-
-function dueText(m: Milestone): string {
-  const base = `Hạn ${fmtDate(m.due_date)}`;
-  if (m.stored_status === "accepted") return base;
-  if (m.days_left < 0) return `${base} · quá ${-m.days_left} ngày`;
-  if (m.days_left === 0) return `${base} · hôm nay`;
-  return `${base} · còn ${m.days_left} ngày`;
 }
 
 function MilestoneStep({
@@ -136,15 +129,18 @@ function MilestoneStep({
               <h3 className={cn("m-0 font-semibold", current ? "text-lg" : "text-base")}>{m.name}</h3>
               {current && <span className="rounded-full bg-foreground px-2.5 py-0.5 text-xs font-medium text-background">Chặng tiếp theo</span>}
             </div>
-            <p className={cn("m-0 mt-1 text-sm", overdue ? "font-medium text-red-600" : "text-muted-foreground")}>
-              {m.code} · {dueText(m)}
+            <p className="m-0 mt-1 text-sm text-muted-foreground">
+              {m.code} · Hạn {fmtDate(m.due_date)}
             </p>
           </div>
           <StatusBadge kind="milestone" value={m.status} />
         </div>
 
-        {m.next_action && !done && <p className="m-0 mt-2 text-sm">{m.next_action}</p>}
-        {m.note && <p className="m-0 mt-2 text-sm text-muted-foreground">Nhận xét của giảng viên: {m.note}</p>}
+        {m.note && (
+          <NoticeCard title="Nhận xét của giảng viên" className="mt-3">
+            <p className="m-0 whitespace-pre-wrap">{m.note}</p>
+          </NoticeCard>
+        )}
 
         {(evidence.length > 0 || m.submittable) && (
           <div className="mt-3 space-y-2 text-sm">
@@ -227,7 +223,11 @@ function MilestoneStep({
             </Row>
           </div>
         </FormDialog>
-        <ErrorText message={up.error ?? submit.error} />
+        {(up.error ?? submit.error) && (
+          <NoticeCard tone="error" title="Có lỗi" className="mt-3">
+            <p className="m-0">{up.error ?? submit.error}</p>
+          </NoticeCard>
+        )}
 
         {m.submittable && working && !locked && (
           <div className="mt-4">

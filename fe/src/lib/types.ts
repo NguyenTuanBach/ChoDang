@@ -60,6 +60,9 @@ export type Outline = {
   feedback: string;
   ai_review?: Partial<OutlineReview>;
   submitted_at: string;
+  /** Tệp đề cương sinh viên đính kèm khi nộp (tải ở `/api/outlines/{id}/file`). */
+  file_name?: string | null;
+  file_size?: number | null;
 };
 
 /** Một việc trong nhật ký tuần; `done` = đã hoàn thành (chưa xong thì chuyển sang tuần sau). */

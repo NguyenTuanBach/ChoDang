@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Async, Card, Empty, EmptyState, LinkButton, Page, StatCard, StatusBadge, Stepper } from "@/components/ui/ui";
+import { Async, Card, EmptyState, LinkButton, Page, StatCard, StatusBadge, Stepper } from "@/components/ui/ui";
 import { useApi } from "@/lib/hooks";
 import { journey } from "@/lib/journey";
 import { fmtDate } from "@/lib/labels";
@@ -106,7 +106,7 @@ export default function StudentHome() {
                 <div className="mt-5 border-t border-foreground/15 pt-5">
                   <p className="m-0 mb-3 text-sm font-medium">Các mốc thực tập</p>
                   {d.milestones.length === 0 ? (
-                    <Empty>Chưa có mốc: mốc được tạo sau khi giảng viên xác nhận hồ sơ.</Empty>
+                    <EmptyState noIcon>Chưa có mốc: mốc được tạo sau khi giảng viên xác nhận hồ sơ.</EmptyState>
                   ) : (
                     <ol className="m-0 list-none p-0">
                       {d.milestones.map((m, i) => (

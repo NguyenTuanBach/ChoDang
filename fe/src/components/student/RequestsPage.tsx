@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Paperclip } from "lucide-react";
 import { useRef, useState } from "react";
+import NoticeCard from "@/components/ui/notice-card";
 import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, Page, Row, StatusBadge, Table } from "@/components/ui/ui";
 import { useAction, useApi } from "@/lib/hooks";
 import { send, upload } from "@/lib/http";
@@ -12,6 +13,8 @@ import DownloadDoc from "./DownloadDoc";
 const MAX_MB = 10;
 // Mọi nút "Áp dụng" cùng một kiểu và độ rộng để thẳng hàng.
 const APPLY = "w-24";
+// Khớp BE (`_ACTIVE` ở request_service): chỉ gửi đơn khi hồ sơ đã được giảng viên xác nhận và đang trong quá trình thực tập.
+const REQUESTABLE = new Set(["confirmed", "in_progress", "pending_credit"]);
 const approverOf = (t: ExceptionType) => (t.affects_credit ? "Quản trị viên (ảnh hưởng tín chỉ)" : "Giảng viên");
 
 // Gửi đơn: danh sách các loại đơn (bấm "Áp dụng" để mở form), kèm danh sách đơn đã gửi của tôi.
@@ -21,6 +24,8 @@ export default function RequestsPage() {
   const profile = useApi<InternshipDetail>("/api/student/internship");
   const [chosen, setChosen] = useState<ExceptionType | null>(null);
   const [extension, setExtension] = useState(false);
+  const status = profile.data?.internship?.status;
+  const canApply = status !== undefined && REQUESTABLE.has(status);
 
   if (extension) {
     return (
@@ -55,6 +60,11 @@ export default function RequestsPage() {
 
   return (
     <Page title="Gửi đơn">
+      {!profile.loading && !canApply && (
+        <NoticeCard tone="warning" title="Chưa gửi được đơn">
+          {status === undefined ? "Bạn chưa đăng ký hồ sơ thực tập." : "Hồ sơ chưa được giảng viên xác nhận hoặc đã kết thúc."} Đơn chỉ gửi được khi hồ sơ đang trong quá trình thực tập.
+        </NoticeCard>
+      )}
       <Card title="Loại đơn" className="bg-background">
         <Async state={types}>
           {(list) => (
@@ -64,7 +74,7 @@ export default function RequestsPage() {
                 <td>Gia hạn mốc thực tập</td>
                 <td>Giảng viên</td>
                 <td>
-                  <Button variant="primary" className={APPLY} onClick={() => setExtension(true)}>
+                  <Button variant="primary" className={APPLY} disabled={!canApply} onClick={() => setExtension(true)}>
                     Áp dụng
                   </Button>
                 </td>
@@ -77,7 +87,7 @@ export default function RequestsPage() {
                     <td>{t.name}</td>
                     <td>{approverOf(t)}</td>
                     <td>
-                      <Button variant="primary" className={APPLY} onClick={() => setChosen(t)}>
+                      <Button variant="primary" className={APPLY} disabled={!canApply} onClick={() => setChosen(t)}>
                         Áp dụng
                       </Button>
                     </td>

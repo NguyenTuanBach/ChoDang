@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAssistantContext, type AutofillCardItem } from "./AssistantProvider";
 
 // Thẻ gợi ý sau khi đính kèm giấy trong Trợ lý: loại giấy + các trường AI đọc được. Trang đích đã được mở và điền nháp (chưa lưu).
-function Card({ card, onDismiss }: { card: AutofillCardItem; onDismiss: () => void }) {
+function Card({ card, onDismiss, onReapply }: { card: AutofillCardItem; onDismiss: () => void; onReapply: () => void }) {
   const fields = Object.entries(card.result?.fields ?? {});
   return (
     <div className={cn("relative rounded-lg border-2 bg-background p-3 text-sm", card.status === "error" ? "border-destructive/40" : "border-beige-strong")}>
@@ -23,7 +23,10 @@ function Card({ card, onDismiss }: { card: AutofillCardItem; onDismiss: () => vo
       {card.status === "done" && card.result && (
         <>
           <p className="m-0 mt-1 text-muted-foreground">
-            {KIND_LABEL[card.result.kind]} · AI đọc được {fields.length} trường. Đã điền nháp ở trang bên cạnh, bạn kiểm tra rồi bấm nút đang nhấp nháy để lưu.
+            {KIND_LABEL[card.result.kind]} ·{" "}
+            {card.result.kind === "outline"
+              ? `AI tách được ${fields.length}/4 phần. Đã điền nháp vào form đề cương, bạn kiểm tra rồi bấm Nộp đề cương.`
+              : `AI đọc được ${fields.length} trường. Đã điền nháp ở trang bên cạnh, bạn kiểm tra rồi bấm nút đang nhấp nháy để lưu.`}
           </p>
           <ul className="m-0 mt-2 max-h-40 list-none space-y-0.5 overflow-y-auto p-0">
             {fields.map(([key, s]) => (
@@ -42,7 +45,8 @@ function Card({ card, onDismiss }: { card: AutofillCardItem; onDismiss: () => vo
             </p>
           ))}
           {card.href && (
-            <Link href={card.href} className="mt-2 inline-block text-primary underline">
+            // Bấm lại: điền lại gợi ý của thẻ vào trang (gợi ý chỉ được trang lấy một lần).
+            <Link href={card.href} onClick={onReapply} className="mt-2 inline-block text-primary underline">
               Mở trang để xác nhận
             </Link>
           )}
@@ -53,12 +57,12 @@ function Card({ card, onDismiss }: { card: AutofillCardItem; onDismiss: () => vo
 }
 
 export default function AutofillCards() {
-  const { autofillCards, dismissAutofillCard } = useAssistantContext();
+  const { autofillCards, dismissAutofillCard, reapplyAutofill } = useAssistantContext();
   if (autofillCards.length === 0) return null;
   return (
     <div className="mx-3 mb-2 max-h-[45%] space-y-2 overflow-y-auto" aria-label="Giấy đã đính kèm">
       {autofillCards.map((card) => (
-        <Card key={card.id} card={card} onDismiss={() => dismissAutofillCard(card.id)} />
+        <Card key={card.id} card={card} onDismiss={() => dismissAutofillCard(card.id)} onReapply={() => reapplyAutofill(card.id)} />
       ))}
     </div>
   );

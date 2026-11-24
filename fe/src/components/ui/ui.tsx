@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, Check, Circle, Clock, Download, Inbox, X, type LucideIcon } from "lucide-react";
-import { useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { AlertCircle, Check, Circle, Clock, Download, Inbox, Upload, X, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { toast } from "sonner";
 import { Button as ShButton, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -183,13 +184,20 @@ export function ErrorText({ message }: { message: string | null }) {
   ) : null;
 }
 
+// Thông báo thành công hiện dạng toast (góc trên phải), không nằm trong thẻ.
 export function OkText({ message }: { message: string | null }) {
-  return message ? (
-    <p className="my-2 flex items-start gap-2 rounded-lg bg-success-soft px-3 py-2 text-sm text-success ring-1 ring-inset ring-success/20">
-      <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span>{message}</span>
-    </p>
-  ) : null;
+  useEffect(() => {
+    if (message) toast.success(message);
+  }, [message]);
+  return null;
+}
+
+// Lỗi hiện dạng toast (góc trên phải), mỗi nơi dùng một tiêu đề riêng để người dùng biết thao tác nào lỗi.
+export function ErrorToast({ title, message }: { title: string; message: string | null }) {
+  useEffect(() => {
+    if (message) toast.error(`${title}: ${message}`);
+  }, [title, message]);
+  return null;
 }
 
 export function EmptyState({ title, children, icon: Icon = Inbox, noIcon, action }: { title?: string; children?: ReactNode; icon?: LucideIcon; noIcon?: boolean; action?: ReactNode }) {
@@ -316,6 +324,54 @@ export function FilePicker({ label, accept, disabled, onFile }: { label: string;
       <Button disabled={disabled} onClick={() => input.current?.click()}>
         {label}
       </Button>
+    </>
+  );
+}
+
+// Khung nét đứt bấm vào (hoặc kéo thả tệp vào) để chọn tệp tải lên; thay cho nút "Tải ..." đứng riêng.
+export function DropZone({ label, accept, disabled, onFile, children }: { label: string; accept?: string; disabled?: boolean; onFile: (file: File) => void; children: ReactNode }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept={accept}
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => input.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file && !disabled) onFile(file);
+        }}
+        className={cn(
+          "my-1 flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center transition-colors",
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-foreground/40 hover:bg-card",
+          over && "border-foreground bg-card",
+        )}
+      >
+        <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Upload aria-hidden="true" className="size-5" />
+        </span>
+        <span className="max-w-md text-sm text-muted-foreground">{children}</span>
+      </button>
     </>
   );
 }

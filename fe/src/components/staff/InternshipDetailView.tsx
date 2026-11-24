@@ -1,13 +1,16 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import { Fragment, useState } from "react";
+import { ArrowUpRight, MoreHorizontal } from "lucide-react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { FIELD_LABEL } from "@/lib/autofill";
 import { send } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { FLAG_KIND, MODE_LABEL, fmtDate, fmtDateTime } from "@/lib/labels";
 import type { EvidenceExtraction, InternshipDetail, Milestone, Outline, Suggestion } from "@/lib/types";
-import { Async, Badge, Button, Card, DecisionPanel, Empty, ErrorText, Field, Page, Pre, Row, StatusBadge, Table } from "@/components/ui/ui";
+import { Async, Badge, Button, Card, DecisionPanel, Empty, ErrorToast, Field, Page, Pre, Row, StatusBadge, Table } from "@/components/ui/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import FormDialog from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import DownloadDoc from "@/components/student/DownloadDoc";
 import { FlagActions } from "./FlagsPanel";
 import { RequestDecision } from "./RequestsReview";
@@ -15,12 +18,21 @@ import { RequestDecision } from "./RequestsReview";
 type Role = "lecturer" | "admin";
 
 // Chi tiết một hồ sơ cho GV (xác nhận, duyệt, chấp nhận mốc, nhận xét, thẩm định) và QTV (xem, phê duyệt công nhận tín chỉ).
+// Nhận xét bằng AI chỉ tồn tại trong lần mở trang này (không lưu lại để hiển thị): đổi trang hoặc tải lại là mất.
+// BE vẫn ghi một bản để lưu vết, nhưng giao diện không đọc lại bản đó.
+type AiReviewStore = { items: Suggestion[]; add: (s: Suggestion) => void };
+const AiReviews = createContext<AiReviewStore>({ items: [], add: () => {} });
+
 export default function InternshipDetailView({ id, role }: { id: number; role: Role }) {
   const state = useApi<InternshipDetail>(`/api/internships/${id}`);
+  const [items, setItems] = useState<Suggestion[]>([]);
+  const add = (s: Suggestion) => setItems((prev) => [s, ...prev.filter((x) => !(x.subject_kind === s.subject_kind && x.subject_id === s.subject_id))]);
   return (
-    <Page title="Hồ sơ thực tập">
-      <Async state={state}>{(d) => <Body d={d} role={role} reload={state.reload} />}</Async>
-    </Page>
+    <AiReviews.Provider value={{ items, add }}>
+      <Page title="Hồ sơ thực tập">
+        <Async state={state}>{(d) => <Body d={d} role={role} reload={state.reload} />}</Async>
+      </Page>
+    </AiReviews.Provider>
   );
 }
 
@@ -28,6 +40,7 @@ type Pending = { kind: string; run: (reason: string) => Promise<unknown>; label:
 
 function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: () => void }) {
   const row = d.internship;
+  const { items: aiItems } = useContext(AiReviews);
   const [pending, setPending] = useState<Pending>(null);
   const action = useAction(() => {
     setPending(null);
@@ -40,18 +53,35 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
   return (
     <>
       <Card>
-        <Row>
-          <h2 style={{ margin: 0 }}>{row.student_name}</h2>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="m-0 text-xl font-bold tracking-tight">{row.student_name}</h2>
+            <p className="m-0 mt-1 text-sm text-muted-foreground">
+              {row.student_code ?? row.student_email} · Khóa {row.cohort} · Giảng viên: {row.lecturer_name ?? "—"}
+            </p>
+          </div>
           <StatusBadge kind="internship" value={row.status} />
-          <span>
-            {row.student_code ?? row.student_email} · Khóa {row.cohort} · GV: {row.lecturer_name ?? "—"}
-          </span>
-        </Row>
-        <p className="mb-0 mt-1">
-          {row.company_name || "Chưa khai báo doanh nghiệp"} · Bắt đầu {fmtDate(row.start_date)} · Kết thúc {fmtDate(row.end_date)} · {MODE_LABEL[row.mode]}
-        </p>
-        {row.decision_reason && <p className="mb-0 mt-1">Lý do quyết định gần nhất: {row.decision_reason}</p>}
-        <div className="mt-3 border-t border-foreground/15 pt-3">
+        </div>
+        <dl className="m-0 mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          <div>
+            <dt className="text-xs text-muted-foreground">Doanh nghiệp</dt>
+            <dd className="m-0 mt-1 text-sm font-medium">{row.company_name || "Chưa khai báo"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Bắt đầu</dt>
+            <dd className="m-0 mt-1 text-sm font-medium">{fmtDate(row.start_date)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Kết thúc</dt>
+            <dd className="m-0 mt-1 text-sm font-medium">{fmtDate(row.end_date)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Hình thức</dt>
+            <dd className="m-0 mt-1 text-sm font-medium">{MODE_LABEL[row.mode]}</dd>
+          </div>
+        </dl>
+        {row.decision_reason && <p className="mb-0 mt-4 text-sm">Lý do quyết định gần nhất: {row.decision_reason}</p>}
+        <div className="mt-5 border-t border-foreground/15 pt-5">
           <dl className="m-0 grid grid-cols-[8.5rem_1fr] gap-x-4 gap-y-2 text-sm">
             <dt className="font-medium text-muted-foreground">MST · Địa chỉ</dt>
             <dd className="m-0">
@@ -81,7 +111,8 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
             <dd className="m-0 whitespace-pre-wrap break-words">{row.job_description}</dd>
           </dl>
           {Object.values(row.field_confirmations).includes("ai_confirmed") && <p className="mb-0 mt-3"><small>Các trường do AI gợi ý và sinh viên đã xác nhận: {Object.entries(row.field_confirmations).filter(([, v]) => v === "ai_confirmed").map(([k]) => FIELD_LABEL[k] ?? k).join(", ")}</small></p>}
-          {d.documents.map((doc) => (
+          {/* Mỗi hồ sơ chỉ có một giấy tiếp nhận: dữ liệu cũ còn nhiều giấy thì chỉ hiện giấy mới nhất. */}
+          {d.documents.slice(-1).map((doc) => (
             <div key={doc.id} className="mt-2">
               <DownloadDoc href={`/api/documents/${doc.id}/download`} name={doc.filename} />
             </div>
@@ -114,20 +145,41 @@ function Body({ d, role, reload }: { d: InternshipDetail; role: Role; reload: ()
         ))}
       </Card>
 
+      {d.outlines.some((o) => aiItems.some((sg) => sg.subject_kind === "outline" && sg.subject_id === o.id)) && (
+        <Card title="Nhận xét của AI về đề cương">
+          <p className="m-0 mb-3 text-xs text-muted-foreground">Nhận xét chỉ hiển thị trong lần xem này; đổi trang hoặc tải lại sẽ không còn.</p>
+          {d.outlines.map((o) => {
+            const items = aiItems.filter((sg) => sg.subject_kind === "outline" && sg.subject_id === o.id);
+            return items.length === 0 ? null : (
+              <div key={o.id} className="mb-4 last:mb-0">
+                <p className="m-0 text-sm font-medium">Phiên bản {o.version}</p>
+                <Suggestions items={items} />
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
       <Card title="Mốc">
-        <Table head={["Mốc", "Hạn", "Trạng thái", "Minh chứng", "Cập nhật", ""]}>
+        <Table head={["Mốc", "Hạn", "Trạng thái", "Minh chứng", "Cập nhật", "Cảnh báo", ""]}>
           {d.milestones.map((m) => (
             <MilestoneRow key={m.id} m={m} d={d} isLecturer={isLecturer} reload={reload} />
           ))}
         </Table>
       </Card>
 
-      <Card title="Nhật ký tuần">
-        {d.journals.length === 0 && <Empty>Chưa có nhật ký.</Empty>}
-        {d.journals.map((j) => (
-          <JournalBlock key={j.id} j={j} isLecturer={isLecturer} reload={reload} />
-        ))}
-      </Card>
+      {d.journals.length === 0 ? (
+        <Card title="Nhật ký tuần">
+          <Empty>Chưa có nhật ký.</Empty>
+        </Card>
+      ) : (
+        <>
+          <h2 className="m-0 text-lg font-semibold">Nhật ký tuần</h2>
+          {d.journals.map((j) => (
+            <JournalBlock key={j.id} j={j} isLecturer={isLecturer} reload={reload} />
+          ))}
+        </>
+      )}
 
       <Card title="Yêu cầu gia hạn / ngoại lệ">
         {d.requests.length === 0 && <Empty>Không có yêu cầu.</Empty>}
@@ -232,14 +284,26 @@ function Suggestions({ items }: { items: Suggestion[] }) {
   );
 }
 
-function PreReviewButton({ internshipId, kind, subjectId, reload }: { internshipId: number; kind: "outline" | "milestone"; subjectId: number; reload: () => void }) {
-  const action = useAction(reload);
+// Nhận xét bằng AI (gợi ý, không quyết định thay giảng viên): gọi BE rồi tải lại; lỗi hiện toast.
+function useAiReview(internshipId: number, kind: "outline" | "milestone", subjectId: number) {
+  const { add } = useContext(AiReviews);
+  const action = useAction();
+  const run = () =>
+    void action.run(async () => {
+      const result = await send<Omit<Suggestion, "created_at">>("POST", `/api/internships/${internshipId}/pre-review`, { subject_kind: kind, subject_id: subjectId });
+      add({ ...result, created_at: new Date().toISOString() });
+    });
+  return { busy: action.busy, error: action.error, run };
+}
+
+function PreReviewButton({ internshipId, kind, subjectId }: { internshipId: number; kind: "outline" | "milestone"; subjectId: number }) {
+  const ai = useAiReview(internshipId, kind, subjectId);
   return (
     <>
-      <Button disabled={action.busy} onClick={() => void action.run(() => send("POST", `/api/internships/${internshipId}/pre-review`, { subject_kind: kind, subject_id: subjectId }))}>
-        {action.busy ? "AI đang đọc..." : "Tiền thẩm bằng AI"}
+      <Button variant="primary" disabled={ai.busy} onClick={ai.run}>
+        {ai.busy ? "AI đang đọc..." : "Nhận xét bằng AI"}
       </Button>
-      <ErrorText message={action.error} />
+      <ErrorToast title="Không lấy được nhận xét của AI" message={ai.error} />
     </>
   );
 }
@@ -250,37 +314,57 @@ function OutlineBlock({ outline: o, d, isLecturer, reload }: { outline: Outline;
     setPending(null);
     reload();
   });
-  const suggestions = d.suggestions.filter((s) => s.subject_kind === "outline" && s.subject_id === o.id);
   const id = d.internship?.id ?? 0;
+  const ai = useAiReview(id, "outline", o.id);
+  const decide = (p: NonNullable<Pending>) => setPending(p);
   return (
-    <div style={{ marginBottom: "1rem" }}>
-      <Row>
-        <strong>Phiên bản {o.version}</strong>
-        <StatusBadge kind="outline" value={o.status} />
-        <span>{fmtDateTime(o.submitted_at)}</span>
-      </Row>
-      <Pre>{o.content}</Pre>
-      {o.outcome_codes.length > 0 && <p>Chuẩn đầu ra đã khai: {o.outcome_codes.join(", ")}</p>}
-      {o.feedback && <p>Phản hồi: {o.feedback}</p>}
-      <Suggestions items={suggestions} />
-      {o.status === "submitted" && (
+    <div className="mb-4 last:mb-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Row>
-          <PreReviewButton internshipId={id} kind="outline" subjectId={o.id} reload={reload} />
-          {isLecturer && (
-            <>
-              <Button variant="primary" onClick={() => setPending({ kind: "o", label: "Duyệt đề cương", needReason: false, run: () => send("POST", `/api/outlines/${o.id}/decision`, { action: "approve" }) })}>
-                Duyệt
-              </Button>
-              <Button onClick={() => setPending({ kind: "o", label: "Yêu cầu sửa", needReason: true, run: (reason) => send("POST", `/api/outlines/${o.id}/decision`, { action: "request_revision", reason }) })}>
-                Yêu cầu sửa
-              </Button>
-              <Button variant="danger" onClick={() => setPending({ kind: "o", label: "Từ chối đề cương", needReason: true, danger: true, run: (reason) => send("POST", `/api/outlines/${o.id}/decision`, { action: "reject", reason }) })}>
-                Từ chối
-              </Button>
-            </>
-          )}
+          <strong>Phiên bản {o.version}</strong>
+          <StatusBadge kind="outline" value={o.status} />
+          <span className="text-sm text-muted-foreground">{fmtDateTime(o.submitted_at)}</span>
         </Row>
-      )}
+        {o.status === "submitted" && (
+          <div className="flex items-center gap-2">
+            {ai.busy && <span className="text-sm text-muted-foreground">AI đang đọc...</span>}
+            <ErrorToast title="Không lấy được nhận xét của AI" message={ai.error} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Thao tác"
+                  disabled={ai.busy}
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border-2 border-foreground/25 bg-card text-foreground shadow-xs hover:bg-secondary disabled:opacity-50"
+                >
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => ai.run()}>Nhận xét bằng AI</DropdownMenuItem>
+                {isLecturer && (
+                  <>
+                    <DropdownMenuItem onSelect={() => decide({ kind: "o", label: "Duyệt đề cương", needReason: false, run: () => send("POST", `/api/outlines/${o.id}/decision`, { action: "approve" }) })}>Duyệt</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => decide({ kind: "o", label: "Yêu cầu sửa", needReason: true, run: (reason) => send("POST", `/api/outlines/${o.id}/decision`, { action: "request_revision", reason }) })}>Yêu cầu sửa</DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onSelect={() => decide({ kind: "o", label: "Từ chối đề cương", needReason: true, danger: true, run: (reason) => send("POST", `/api/outlines/${o.id}/decision`, { action: "reject", reason }) })}>
+                    Từ chối
+                  </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+      <div className="mt-3">
+        <Pre>{o.content}</Pre>
+        {o.file_name && (
+          <div className="mt-2">
+            <DownloadDoc href={`/api/outlines/${o.id}/file`} name={o.file_name} />
+          </div>
+        )}
+      </div>
+      {o.feedback && <p className="mb-0 mt-3 text-sm">Phản hồi: {o.feedback}</p>}
       {pending && <Decision pending={pending} action={action} onCancel={() => setPending(null)} />}
     </div>
   );
@@ -295,11 +379,24 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
   // Chỉ hiện minh chứng gần nhất của mốc; thời điểm cập nhật = lúc duyệt nếu đã duyệt, không thì lúc nộp.
   const updatedAt = (e: InternshipDetail["evidence"][number]) => e.reviewed_at ?? e.submitted_at;
   const latest = d.evidence.filter((e) => e.milestone_code === m.code).sort((a, b) => updatedAt(b).localeCompare(updatedAt(a)))[0];
-  const suggestions = d.suggestions.filter((s) => s.subject_kind === "milestone" && s.subject_id === m.id);
+  const suggestions = useContext(AiReviews).items.filter((s) => s.subject_kind === "milestone" && s.subject_id === m.id);
   const id = d.internship?.id ?? 0;
+  const [detailOpen, setDetailOpen] = useState(false);
+  const extraction = latest?.extraction;
   return (
     <>
-      <tr>
+      {extraction && (
+        <FormDialog title={`${m.code} — ${m.name}`} wide open={detailOpen} onOpenChange={setDetailOpen}>
+          <ExtractionBlock extraction={extraction} />
+        </FormDialog>
+      )}
+      <tr
+        // Bấm vào dòng mốc (không phải liên kết hay nút bên trong) thì mở popup chi tiết nếu mốc có thông tin trên giấy.
+        className={extraction ? "cursor-pointer" : undefined}
+        tabIndex={extraction ? 0 : undefined}
+        onClick={extraction ? (e) => !(e.target as HTMLElement).closest("a, button, [role=menuitem]") && setDetailOpen(true) : undefined}
+        onKeyDown={extraction ? (e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && setDetailOpen(true) : undefined}
+      >
         <td>
           {m.code} — {m.name}
         </td>
@@ -324,9 +421,12 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
         </td>
         <td className="whitespace-nowrap">{latest ? fmtDateTime(updatedAt(latest)) : "—"}</td>
         <td>
+          {extraction ? extraction.mismatches.length > 0 ? <Badge tone="bad">{extraction.mismatches.length} cảnh báo</Badge> : <span className="text-sm text-muted-foreground">Không có</span> : "—"}
+        </td>
+        <td>
           {m.stored_status === "submitted" && (
             <Row>
-              <PreReviewButton internshipId={id} kind="milestone" subjectId={m.id} reload={reload} />
+              <PreReviewButton internshipId={id} kind="milestone" subjectId={m.id} />
               {isLecturer && (
                 <>
                   <Button variant="primary" onClick={() => setPending({ kind: "m", label: "Chấp nhận mốc", needReason: false, run: () => send("POST", `/api/milestones/${m.id}/accept`) })}>
@@ -341,15 +441,15 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
           )}
         </td>
       </tr>
-      {(pending || suggestions.length > 0 || latest?.extraction) && (
+      {(pending || suggestions.length > 0) && (
         <tr>
-          <td colSpan={6}>
-            {latest?.extraction && <ExtractionBlock extraction={latest.extraction} />}
+          <td colSpan={7}>
             <Suggestions items={suggestions} />
             {pending && <Decision pending={pending} action={action} onCancel={() => setPending(null)} />}
           </td>
         </tr>
       )}
+
     </>
   );
 }
@@ -358,28 +458,40 @@ function MilestoneRow({ m, d, isLecturer, reload }: { m: Milestone; d: Internshi
 function ExtractionBlock({ extraction }: { extraction: EvidenceExtraction }) {
   const entries = Object.entries(extraction.fields);
   return (
-    <div className="mb-3 rounded-lg border-2 border-beige-strong bg-background p-3 text-sm">
-      <strong>Thông tin trên giấy (sinh viên xác nhận {fmtDateTime(extraction.confirmed_at)})</strong>
+    <div className="mb-3 rounded-lg border-2 border-beige-strong bg-background p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <strong className="text-base">Thông tin trên giấy</strong>
+        <span className="text-sm text-muted-foreground">Sinh viên xác nhận lúc {fmtDateTime(extraction.confirmed_at)}</span>
+      </div>
+      <dl className="m-0 mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+        {entries.map(([key, value]) => (
+          <div key={key} className="min-w-0">
+            <dt className="text-sm text-muted-foreground">{FIELD_LABEL[key] ?? key}</dt>
+            <dd className="m-0 mt-1 whitespace-pre-wrap break-words text-base font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
       {extraction.mismatches.length > 0 && (
-        <div className="mt-2 space-y-1" role="alert">
+        <div className="mt-5 space-y-2 border-t border-foreground/15 pt-4" role="alert">
+          <p className="m-0 text-sm font-medium text-muted-foreground">Cần kiểm tra</p>
           {extraction.mismatches.map((m) => (
-            <p key={m.field + m.label} className="m-0 text-red-600">
-              <strong>{m.label}</strong> — {m.detail}
-            </p>
+            <div key={m.field + m.label} className="rounded-lg border-2 border-destructive/40 bg-danger-soft px-3 py-2 text-sm text-destructive">
+              <strong>{m.label}</strong>
+              <div className="mt-0.5">{m.detail}</div>
+            </div>
           ))}
         </div>
       )}
-      <dl className="m-0 mt-2 grid grid-cols-[11rem_1fr] gap-x-4 gap-y-1">
-        {entries.map(([key, value]) => (
-          <Fragment key={key}>
-            <dt className="text-muted-foreground">{FIELD_LABEL[key] ?? key}</dt>
-            <dd className="m-0 whitespace-pre-wrap break-words">
-              {value}
-              {extraction.confirmations[key] === "ai_confirmed" && <small className="ml-1 text-muted-foreground">(AI đọc)</small>}
-            </dd>
-          </Fragment>
-        ))}
-      </dl>
+    </div>
+  );
+}
+
+// Mỗi tuần một card, mỗi mục có nhãn riêng: việc đã làm, việc dự kiến (kèm đã/chưa xong), đang vướng, gợi ý AI, nhận xét.
+function JournalRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 gap-1 border-t border-foreground/15 py-3 first:border-t-0 first:pt-0 sm:grid-cols-[9rem_1fr] sm:gap-4">
+      <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
+      <dd className="m-0 min-w-0 whitespace-pre-wrap break-words text-sm leading-relaxed">{children}</dd>
     </div>
   );
 }
@@ -390,36 +502,57 @@ function JournalBlock({ j, isLecturer, reload }: { j: InternshipDetail["journals
     setComment("");
     reload();
   });
+  const items = j.plan_items ?? [];
+  const doneCount = items.filter((it) => it.done).length;
   return (
-    <div style={{ marginBottom: "1rem" }}>
-      <strong>Tuần bắt đầu {fmtDate(j.week_start)}</strong>
-      <Pre>{j.content}</Pre>
-      {(j.plan_items ?? []).length > 0 && (
-        <ul style={{ margin: "0.25rem 0", paddingLeft: "1.25rem" }}>
-          {j.plan_items.map((it, i) => (
-            <li key={`${i}-${it.text}`}>
-              {it.done ? "✓" : "○"} {it.text}
-            </li>
-          ))}
-        </ul>
-      )}
-      {j.blockers && <p>Đang vướng: {j.blockers}</p>}
-      {j.ai_advice && <p>Gợi ý lịch từ AI (sinh viên tự hỏi): {j.ai_advice}</p>}
-      {j.lecturer_comment && <p>Nhận xét: {j.lecturer_comment}</p>}
+    <Card title={`Tuần bắt đầu ${fmtDate(j.week_start)}`} actions={items.length > 0 ? <span className="text-sm text-muted-foreground">Hoàn thành {doneCount}/{items.length} việc</span> : undefined}>
+      <dl className="m-0">
+        <JournalRow label="Việc đã làm">{j.content}</JournalRow>
+        {items.length > 0 && (
+          <JournalRow label="Kế hoạch tuần tới">
+            <ul className="m-0 list-none space-y-1.5 p-0">
+              {items.map((it, i) => (
+                <li key={`${i}-${it.text}`} className="flex items-start gap-2">
+                  <span className={cn("mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded border-2 text-[10px] font-bold leading-none", it.done ? "border-green-600 bg-green-600 text-white" : "border-foreground/30 bg-background text-transparent")}>✓</span>
+                  <span className={it.done ? "text-muted-foreground" : undefined}>{it.text}</span>
+                </li>
+              ))}
+            </ul>
+          </JournalRow>
+        )}
+        {j.blockers && <JournalRow label="Đang vướng">{j.blockers}</JournalRow>}
+        {j.ai_advice && (
+          <JournalRow label="Gợi ý lịch từ AI">
+            {j.ai_advice}
+            <div className="mt-1 text-xs text-muted-foreground">Sinh viên tự hỏi AI khi viết nhật ký.</div>
+          </JournalRow>
+        )}
+        {j.lecturer_comment && <JournalRow label="Nhận xét của giảng viên">{j.lecturer_comment}</JournalRow>}
+      </dl>
       {isLecturer && (
-        <>
+        <div className="mt-4 border-t border-foreground/15 pt-4">
           <Field label={j.lecturer_comment ? "Cập nhật nhận xét" : "Nhận xét"}>
             <textarea value={comment} onChange={(e) => setComment(e.target.value)} style={{ minHeight: "3rem" }} />
           </Field>
-          <ErrorText message={action.error} />
-          <Button disabled={action.busy || !comment.trim()} onClick={() => void action.run(() => send("POST", `/api/journal/${j.id}/comment`, { comment }))}>
+          <ErrorToast title="Không gửi được nhận xét" message={action.error} />
+          <Button variant="primary" disabled={action.busy || !comment.trim()} onClick={() => void action.run(() => send("POST", `/api/journal/${j.id}/comment`, { comment }))}>
             Gửi nhận xét
           </Button>
-        </>
+        </div>
       )}
-    </div>
+    </Card>
   );
 }
+
+// Kết quả thẩm định tín chỉ: nhãn tiếng Việt, đạt/được công nhận màu xanh lá, trả lại/không công nhận màu đỏ.
+const ASSESSMENT_LABEL: Record<string, string> = {
+  pending: "Đang thẩm định",
+  lecturer_passed: "Giảng viên thẩm định đạt, chờ quản trị viên",
+  lecturer_returned: "Giảng viên trả lại",
+  approved: "Được công nhận",
+  denied: "Không công nhận",
+};
+const ASSESSMENT_TONE: Record<string, "good" | "warn" | "bad"> = { pending: "warn", lecturer_passed: "good", lecturer_returned: "bad", approved: "good", denied: "bad" };
 
 function CreditCard({ d, role, reload }: { d: InternshipDetail; role: Role; reload: () => void }) {
   const row = d.internship;
@@ -446,12 +579,29 @@ function CreditCard({ d, role, reload }: { d: InternshipDetail; role: Role; relo
         ))}
       </Table>
       {credit.assessment && (
-        <p>
-          Thẩm định của giảng viên: <Badge>{credit.assessment.status}</Badge> {credit.assessment.lecturer_note}
-          {credit.assessment.admin_reason && ` · QTV: ${credit.assessment.admin_reason}`}
-        </p>
+        <div className="mt-4 rounded-lg border-2 border-foreground/15 bg-background px-4 py-3">
+          <dl className="m-0 grid grid-cols-[9rem_1fr] items-start gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">Kết quả thẩm định</dt>
+            <dd className="m-0">
+              <Badge tone={ASSESSMENT_TONE[credit.assessment.status] ?? "neutral"}>{ASSESSMENT_LABEL[credit.assessment.status] ?? credit.assessment.status}</Badge>
+            </dd>
+            {credit.assessment.lecturer_note && (
+              <>
+                <dt className="text-muted-foreground">Ghi chú giảng viên</dt>
+                <dd className="m-0 whitespace-pre-wrap break-words">{credit.assessment.lecturer_note}</dd>
+              </>
+            )}
+            {credit.assessment.admin_reason && (
+              <>
+                <dt className="text-muted-foreground">Quản trị viên</dt>
+                <dd className="m-0 whitespace-pre-wrap break-words">{credit.assessment.admin_reason}</dd>
+              </>
+            )}
+          </dl>
+        </div>
       )}
       {role === "lecturer" && row.status === "pending_credit" && (
+        <div className="mt-4">
         <Row>
           <Button variant="primary" disabled={!credit.all_met} onClick={() => setPending({ kind: "c", label: "Thẩm định đạt, chuyển QTV", needReason: false, run: (note) => send("POST", `/api/internships/${row.id}/credit/assess`, { passed: true, note }) })}>
             Thẩm định đạt
@@ -459,10 +609,12 @@ function CreditCard({ d, role, reload }: { d: InternshipDetail; role: Role; relo
           <Button variant="danger" onClick={() => setPending({ kind: "c", label: "Trả hồ sơ lại cho sinh viên", needReason: true, danger: true, run: (note) => send("POST", `/api/internships/${row.id}/credit/assess`, { passed: false, note }) })}>
             Trả lại sinh viên
           </Button>
-          {!credit.all_met && <small>Chỉ thẩm định đạt khi mọi điều kiện đạt (hãy chấp nhận mốc M3–M5 trước).</small>}
+          {!credit.all_met && <small className="text-muted-foreground">Chỉ thẩm định đạt khi mọi điều kiện đạt (hãy chấp nhận mốc M3–M5 trước).</small>}
         </Row>
+        </div>
       )}
       {role === "admin" && row.status === "credit_review" && (
+        <div className="mt-4">
         <Row>
           <Button variant="primary" onClick={() => setPending({ kind: "c", label: "Phê duyệt công nhận (ghi LMS)", needReason: false, run: (reason) => send("POST", `/api/internships/${row.id}/credit/decision`, { approve: true, reason }) })}>
             Phê duyệt công nhận
@@ -471,6 +623,7 @@ function CreditCard({ d, role, reload }: { d: InternshipDetail; role: Role; relo
             Không công nhận
           </Button>
         </Row>
+        </div>
       )}
       {pending && <Decision pending={pending} action={action} onCancel={() => setPending(null)} />}
     </Card>

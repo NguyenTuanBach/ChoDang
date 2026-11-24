@@ -5,7 +5,8 @@ import { FIELD_LABEL, PULSE, type PendingAutofill, type Suggestion } from "@/lib
 import { send } from "@/lib/http";
 import { useAction } from "@/lib/hooks";
 import type { Evidence, EvidenceMismatch } from "@/lib/types";
-import { Button, ErrorText, OkText, Row } from "@/components/ui/ui";
+import NoticeCard from "@/components/ui/notice-card";
+import { Button, OkText, Row } from "@/components/ui/ui";
 
 // Trường của giấy xác nhận / phiếu đánh giá (khớp COMPLETION_FIELDS ở BE và agent).
 const FIELDS: { key: string; type?: string; wide?: boolean }[] = [
@@ -110,7 +111,11 @@ export default function EvidenceFieldsForm({
           </Button>
         )}
       </div>
-      {note && <p className="m-0 mb-2 text-sm text-muted-foreground">{note}</p>}
+      {note && (
+        <NoticeCard title="Ghi chú của AI" className="mb-2">
+          <p className="m-0">{note}</p>
+        </NoticeCard>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
         {FIELDS.map((f) => (
           <label key={f.key} className={f.wide ? "sm:col-span-2" : undefined}>
@@ -130,16 +135,21 @@ export default function EvidenceFieldsForm({
         ))}
       </div>
       {mismatches.length > 0 && (
-        <div className="mt-3 space-y-1" role="alert">
-          {mismatches.map((m) => (
-            <p key={m.field + m.label} className="m-0 text-sm text-red-600">
-              <strong>{m.label}</strong> — {m.detail}
-            </p>
-          ))}
-          <p className="m-0 text-xs text-muted-foreground">Giảng viên sẽ thấy các cảnh báo này khi duyệt mốc.</p>
-        </div>
+        <NoticeCard tone="warning" title="Cảnh báo đối chiếu với hồ sơ" className="mt-3">
+          <ul className="m-0 list-none space-y-1 p-0">
+            {mismatches.map((m) => (
+              <li key={m.field + m.label}>
+                <strong>{m.label}</strong> <span className="text-muted-foreground">— {m.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </NoticeCard>
       )}
-      <ErrorText message={extract.error ?? confirm.error} />
+      {(extract.error ?? confirm.error) && (
+        <NoticeCard tone="error" title="Có lỗi" className="mt-3">
+          <p className="m-0">{extract.error ?? confirm.error}</p>
+        </NoticeCard>
+      )}
       <OkText message={message} />
       {editable && (
         <div ref={confirmRef} className="mt-3">

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type Suggestion = { value: string; confidence: number; source: string };
-export type AutofillKind = "receipt_letter" | "completion_letter";
+export type AutofillKind = "receipt_letter" | "completion_letter" | "outline";
 
 export type AutofillResult = {
   kind: AutofillKind;
@@ -18,19 +18,27 @@ export type AutofillResult = {
 
 export type PendingAutofill = { kind: AutofillKind; documentId: number | null; evidenceId: number | null; fields: Record<string, Suggestion>; warnings: string[] };
 
-let pending: PendingAutofill | null = null;
-const listeners = new Set<() => void>();
+// Kho đặt ở `globalThis` để mọi bản của module này (kể cả khi Next tải nóng một phần file) dùng chung một kho:
+// ngăn Trợ lý và trang đích không bao giờ giữ hai kho riêng.
+type AutofillStore = { pending: PendingAutofill | null; listeners: Set<() => void> };
+const holder = globalThis as typeof globalThis & { __vin15Autofill?: AutofillStore };
+const store: AutofillStore = (holder.__vin15Autofill ??= { pending: null, listeners: new Set() });
 
 export function setPendingAutofill(value: PendingAutofill): void {
-  pending = value;
-  for (const listener of listeners) listener();
+  store.pending = value;
+  for (const listener of store.listeners) listener();
+}
+
+/** Gợi ý chờ điền suy ra từ kết quả BE trả về (dùng lại khi thẻ trong Trợ lý được áp dụng lần nữa). */
+export function toPending(result: AutofillResult): PendingAutofill {
+  return { kind: result.kind, documentId: result.document_id, evidenceId: result.evidence_id, fields: result.fields, warnings: result.warnings ?? [] };
 }
 
 // Lấy và xóa (chỉ trang đúng loại giấy mới lấy).
 export function takePendingAutofill(kind: AutofillKind): PendingAutofill | null {
-  if (!pending || pending.kind !== kind) return null;
-  const value = pending;
-  pending = null;
+  if (!store.pending || store.pending.kind !== kind) return null;
+  const value = store.pending;
+  store.pending = null;
   return value;
 }
 
@@ -38,7 +46,7 @@ export function takePendingAutofill(kind: AutofillKind): PendingAutofill | null 
 // `nonce` tăng mỗi lần có gợi ý mới: trang dùng làm `key` để dựng lại form. `clear()` khi người dùng đã lưu/xác nhận.
 export function usePendingAutofill(kind: AutofillKind, onNew?: () => void): { value: PendingAutofill | null; nonce: number; clear: () => void } {
   // Khởi tạo chỉ đọc (StrictMode gọi hàm khởi tạo hai lần); xóa khỏi kho trong effect.
-  const [value, setValue] = useState<PendingAutofill | null>(() => (pending?.kind === kind ? pending : null));
+  const [value, setValue] = useState<PendingAutofill | null>(() => (store.pending?.kind === kind ? store.pending : null));
   const [nonce, setNonce] = useState(0);
   const onNewRef = useRef(onNew);
   useEffect(() => {
@@ -55,9 +63,9 @@ export function usePendingAutofill(kind: AutofillKind, onNew?: () => void): { va
       setNonce((n) => n + 1);
       onNewRef.current?.();
     };
-    listeners.add(listener);
+    store.listeners.add(listener);
     return () => {
-      listeners.delete(listener);
+      store.listeners.delete(listener);
     };
   }, [kind]);
   const clear = useCallback(() => setValue(null), []);
@@ -67,6 +75,7 @@ export function usePendingAutofill(kind: AutofillKind, onNew?: () => void): { va
 export const KIND_LABEL: Record<AutofillKind, string> = {
   receipt_letter: "Giấy tiếp nhận thực tập",
   completion_letter: "Giấy xác nhận / phiếu đánh giá của doanh nghiệp",
+  outline: "Đề cương thực tập",
 };
 
 // Nhãn trường để hiển thị gợi ý (hồ sơ + giấy xác nhận).
@@ -100,6 +109,10 @@ export const FIELD_LABEL: Record<string, string> = {
   letter_number: "Số hiệu văn bản",
   letter_date: "Ngày ký văn bản",
   has_stamp: "Có chữ ký / dấu",
+  objective: "Mục tiêu",
+  tasks: "Nhiệm vụ",
+  plan: "Kế hoạch",
+  results: "Kết quả dự kiến",
 };
 
 // Nút cần người dùng bấm sau khi AI điền: nhấp nháy cho tới khi bấm.

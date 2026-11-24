@@ -1,11 +1,10 @@
 "use client";
 
-import { AlarmClock, FolderOpen, Flag } from "lucide-react";
 import { useApi } from "@/lib/hooks";
 import { INTERNSHIP_STATUS, MILESTONE_STATUS } from "@/lib/labels";
 import type { Dashboard } from "@/lib/types";
 import { BarChart, BarLabels, CATEGORY_COLORS, PieChart } from "@/components/ui/charts";
-import { Async, Card, Cols, DownloadButton, Empty, Page, ProgressBar, Row, StatCard, isDoneStatus } from "@/components/ui/ui";
+import { Async, Card, Cols, DownloadButton, EmptyState, Page, ProgressBar, Row, StatCard, isDoneStatus } from "@/components/ui/ui";
 
 const CREDIT_LABEL: Record<string, string> = {
   pending: "Đang thẩm định",
@@ -35,7 +34,7 @@ function milestoneBars(rows: { status: string; n: number }[]) {
 
 function Bars({ rows, labels }: { rows: { key: string; n: number }[]; labels: Record<string, string> }) {
   const max = Math.max(1, ...rows.map((r) => r.n));
-  if (rows.length === 0) return <Empty>Chưa có dữ liệu.</Empty>;
+  if (rows.length === 0) return <EmptyState noIcon>Chưa có dữ liệu.</EmptyState>;
   return (
     <>
       {rows.map((r) => (
@@ -71,19 +70,19 @@ export default function DashboardView() {
           return (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <StatCard label="Tổng số hồ sơ" value={total} icon={FolderOpen} />
+                <StatCard label="Tổng số hồ sơ" value={total} />
                 <StatCard
                   label="Tỷ lệ trễ hạn"
                   value={`${lateRate}%`}
                   hint={`${d.late_internships}/${d.active_internships} hồ sơ đang thực tập có mốc quá hạn`}
-                  icon={AlarmClock}
+                 
                   tone={lateRate > 0 ? "bad" : "good"}
                 />
                 <StatCard
                   label="Cờ rủi ro đang mở"
                   value={flagTotal}
                   hint={openFlags.map((f) => `${f.severity}: ${f.n}`).join(" · ") || "Không có"}
-                  icon={Flag}
+                 
                   tone={flagTotal > 0 ? "warn" : "good"}
                 />
               </div>

@@ -1,6 +1,5 @@
 "use client";
 
-import { AlarmClock, Flag, Hourglass, Inbox, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -43,7 +42,7 @@ function StatusDistribution({ rows: unsorted }: { rows: { status: string; n: num
   // Cùng màu nằm liền nhau: xanh lá (hoàn thành/đang tốt) trước, đỏ (chưa hoàn thành) sau; trong mỗi nhóm giữ nguyên thứ tự.
   const rows = [...unsorted].sort((a, b) => Number(isDoneStatus(b.status)) - Number(isDoneStatus(a.status)));
   const total = rows.reduce((s, r) => s + r.n, 0);
-  if (total === 0) return <EmptyState>Chưa có hồ sơ nào trong phạm vi của bạn.</EmptyState>;
+  if (total === 0) return <EmptyState noIcon>Chưa có hồ sơ nào trong phạm vi của bạn.</EmptyState>;
   return (
     <div>
       <div className="flex h-3 overflow-hidden rounded-full border border-foreground/25 bg-muted" role="img" aria-label="Phân bố hồ sơ theo trạng thái">
@@ -98,20 +97,20 @@ function QueueView({ base, initialFilter }: { base: "/lecturer" | "/admin"; init
   return (
     <Page title={`Xin chào, ${firstName}`} description={isAdmin ? "Việc cần xử lý và tình hình thực tập toàn khóa." : "Việc cần duyệt và tình hình sinh viên bạn phụ trách."}>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Đang thực tập" value={d?.active_internships ?? "…"} hint={isAdmin ? "Toàn khóa" : "Sinh viên bạn phụ trách"} icon={Users} href={`${base}/internships`} />
+        <StatCard label="Đang thực tập" value={d?.active_internships ?? "…"} hint={isAdmin ? "Toàn khóa" : "Sinh viên bạn phụ trách"} href={`${base}/internships`} />
         <StatCard
           label="Hồ sơ trễ hạn"
           value={d?.late_internships ?? "…"}
           hint="Có mốc quá hạn"
-          icon={AlarmClock}
+         
           tone={d && d.late_internships > 0 ? "bad" : "good"}
           href={`${base}/internships`}
         />
-        <StatCard label="Cờ rủi ro mở" value={openFlags ?? "…"} hint="Đang mở hoặc đã ghi nhận" icon={Flag} tone={openFlags ? "warn" : "good"} href={isAdmin ? "/dashboard" : "/lecturer/flags"} />
+        <StatCard label="Cờ rủi ro mở" value={openFlags ?? "…"} hint="Đang mở hoặc đã ghi nhận" tone={openFlags ? "warn" : "good"} href={isAdmin ? "/dashboard" : "/lecturer/flags"} />
         {isAdmin ? (
-          <StatCard label="Chờ phê duyệt tín chỉ" value={awaitingCredit ?? "…"} hint={syncIssues ? `${syncIssues} việc đồng bộ LMS chưa xong` : "Việc đồng bộ LMS ổn"} icon={ShieldCheck} tone={awaitingCredit ? "warn" : "good"} href="/admin/credit" />
+          <StatCard label="Chờ phê duyệt tín chỉ" value={awaitingCredit ?? "…"} hint={syncIssues ? `${syncIssues} việc đồng bộ LMS chưa xong` : "Việc đồng bộ LMS ổn"} tone={awaitingCredit ? "warn" : "good"} href="/admin/credit" />
         ) : (
-          <StatCard label="Việc chờ bạn" value={queue.data?.length ?? "…"} hint="Trong hàng chờ bên dưới" icon={Hourglass} tone={queue.data?.length ? "warn" : "good"} />
+          <StatCard label="Việc chờ bạn" value={queue.data?.length ?? "…"} hint="Trong hàng chờ bên dưới" tone={queue.data?.length ? "warn" : "good"} />
         )}
       </div>
 
@@ -125,7 +124,7 @@ function QueueView({ base, initialFilter }: { base: "/lecturer" | "/admin"; init
             <Async state={queue}>
               {(items) =>
                 items.length === 0 ? (
-                  <EmptyState icon={Inbox} title="Không có việc nào đang chờ bạn">
+                  <EmptyState noIcon title="Không có việc nào đang chờ bạn">
                     Hồ sơ, đề cương, mốc và yêu cầu mới sẽ hiện ở đây.
                   </EmptyState>
                 ) : (
@@ -141,7 +140,7 @@ function QueueView({ base, initialFilter }: { base: "/lecturer" | "/admin"; init
                       );
                     })}
                   </div>
-                  {items.filter((FILTERS.find((f) => f.key === filter) ?? FILTERS[0]).match).length === 0 && <EmptyState icon={Inbox} title="Không có việc nào thuộc bộ lọc này" />}
+                  {items.filter((FILTERS.find((f) => f.key === filter) ?? FILTERS[0]).match).length === 0 && <EmptyState noIcon title="Không có việc nào thuộc bộ lọc này" />}
                   <ul className="m-0 list-none space-y-3 p-0">
                     {items.filter((FILTERS.find((f) => f.key === filter) ?? FILTERS[0]).match).map((i) => {
                       const urgent = i.priority >= 60;

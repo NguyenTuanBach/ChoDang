@@ -45,7 +45,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { key: "students", href: "/lecturer/students", label: "Sinh viên", icon: Users, group: "Công việc" },
     { key: "internships", href: "/lecturer/internships", label: "Hồ sơ", icon: FolderOpen, group: "Công việc", filters: INTERNSHIP_FILTERS },
     { key: "requests", href: "/lecturer/requests", label: "Yêu cầu", icon: LifeBuoy, group: "Công việc" },
-    { key: "flags", href: "/lecturer/flags", label: "Cờ rủi ro", icon: Flag, group: "Theo dõi", filters: ["status"] },
+    { key: "flags", href: "/lecturer/flags", label: "Rủi ro tiến độ", icon: Flag, group: "Theo dõi", filters: ["status"] },
     { key: "dashboard", href: "/dashboard", label: "Dashboard", icon: BarChart3, group: "Theo dõi" },
   ],
   admin: [

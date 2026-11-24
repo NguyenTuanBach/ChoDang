@@ -3,21 +3,29 @@
 import { useApi } from "@/lib/hooks";
 import { fmtDateTime } from "@/lib/labels";
 import type { LmsRecord } from "@/lib/types";
-import { Async, Badge, Card, Empty, Page, Table } from "@/components/ui/ui";
+import { Async, Card, Empty, Page, Table } from "@/components/ui/ui";
 
-// Thứ tự: tín chỉ nhận được từ thực tập (quan trọng nhất) → điều kiện để học học phần thực tập → bảng điểm các môn đã học.
+// Thứ tự: tín chỉ nhận được từ thực tập (quan trọng nhất) → bảng điểm các môn đã học. Không hiện điều kiện học phần (không chặn việc đăng ký).
 export function RecordView({ data }: { data: LmsRecord }) {
   const record = data.record;
   return (
     <>
       <Card title="Tín chỉ từ thực tập">
         {!record ? (
-          <Empty>{data.student_code ? `Chưa có dữ liệu trong LMS cho mã ${data.student_code}.` : "Tài khoản chưa có mã sinh viên."}</Empty>
+          <Empty>
+            {data.student_code
+              ? `Chưa có dữ liệu trong LMS cho mã ${data.student_code}.`
+              : "Tài khoản chưa có mã sinh viên."}
+          </Empty>
         ) : (
           <>
             <p className="m-0 flex items-baseline gap-2">
-              <span className="text-4xl font-bold tabular-nums">{record.total_credits}</span>
-              <span className="text-sm text-muted-foreground">tín chỉ đã được công nhận từ thực tập</span>
+              <span className="text-4xl font-bold tabular-nums">
+                {record.total_credits}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                tín chỉ đã được công nhận từ thực tập
+              </span>
             </p>
             {record.credits.length === 0 ? (
               <div className="mt-4">
@@ -25,7 +33,9 @@ export function RecordView({ data }: { data: LmsRecord }) {
               </div>
             ) : (
               <div className="mt-4">
-                <Table head={["Học phần", "Tên", "Tín chỉ", "Nguồn", "Ghi lúc"]}>
+                <Table
+                  head={["Học phần", "Tên", "Tín chỉ", "Nguồn", "Ghi lúc"]}
+                >
                   {record.credits.map((c) => (
                     <tr key={`${c.course_code}-${c.posted_at}`}>
                       <td>{c.course_code}</td>
@@ -42,20 +52,10 @@ export function RecordView({ data }: { data: LmsRecord }) {
         )}
       </Card>
 
-      <Card title="Điều kiện để học học phần thực tập">
-        <p className="m-0 mb-3 text-sm text-muted-foreground">Cần học xong và đạt điểm tối thiểu ở một số môn trước khi được thực tập.</p>
-        <Badge tone={data.prerequisites.met ? "good" : "warn"}>{data.prerequisites.met ? "Đủ điều kiện" : "Chưa đủ điều kiện"}</Badge>
-        {data.prerequisites.missing.length > 0 && (
-          <ul className="mb-0 mt-3">
-            {data.prerequisites.missing.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
       {record && (
-        <Card title={`Bảng điểm các môn đã học — ${record.student_code} (${record.full_name})`}>
+        <Card
+          title={`Bảng điểm các môn đã học — ${record.student_code} (${record.full_name})`}
+        >
           {record.grades.length === 0 ? (
             <Empty>Chưa có điểm.</Empty>
           ) : (

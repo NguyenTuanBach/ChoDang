@@ -1,13 +1,15 @@
 "use client";
 
+import { CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PULSE, usePendingAutofill, type PendingAutofill, type Suggestion } from "@/lib/autofill";
 import { send, upload } from "@/lib/http";
 import { useAction, useApi } from "@/lib/hooks";
 import { MODE_LABEL, fmtDate } from "@/lib/labels";
 import type { Check, InternshipDetail } from "@/lib/types";
-import { Async, Badge, Button, Card, Empty, ErrorText, Field, FilePicker, OkText, Page, Row, StatusBadge } from "@/components/ui/ui";
+import { Async, Badge, Button, Card, DropZone, Empty, ErrorToast, Field, OkText, Page, Row, StatusBadge } from "@/components/ui/ui";
 import DownloadDoc from "./DownloadDoc";
+import NoticeCard from "@/components/ui/notice-card";
 import EvidencePreviewDialog from "./EvidencePreviewDialog";
 
 type Form = {
@@ -46,13 +48,21 @@ const FIELDS: { key: keyof Form; label: string; type?: string; wide?: boolean }[
   { key: "start_date", label: "Ngày bắt đầu", type: "date" },
   { key: "end_date", label: "Ngày kết thúc", type: "date" },
   { key: "job_description", label: "Mô tả công việc", wide: true },
-  { key: "receipt_letter_number", label: "Số hiệu giấy tiếp nhận" },
-  { key: "receipt_letter_date", label: "Ngày ký giấy tiếp nhận", type: "date" },
-  { key: "receipt_signer_name", label: "Người ký giấy tiếp nhận" },
-  { key: "receipt_signer_title", label: "Chức vụ người ký" },
 ];
 
+// Thông tin của chính tờ giấy tiếp nhận (không phải dữ liệu thực tập): hiện trong thẻ giấy tiếp nhận.
+const RECEIPT_FIELDS: { key: keyof Form; label: string; type?: string }[] = [
+  { key: "receipt_letter_number", label: "Số hiệu giấy" },
+  { key: "receipt_letter_date", label: "Ngày ký giấy", type: "date" },
+  { key: "receipt_signer_name", label: "Người ký giấy" },
+  { key: "receipt_signer_title", label: "Chức vụ người ký" },
+];
+const ALL_FIELDS = [...FIELDS, ...RECEIPT_FIELDS];
+
 const EDITABLE = ["draft", "revision_requested"];
+// Sau khi nộp: chỉ phần cá nhân còn sửa được (khớp BE `PERSONAL_FIELDS` / `PERSONAL_EDITABLE_STATUSES`); thông tin công ty và thời gian bị khóa.
+const PERSONAL_EDITABLE = ["submitted", "confirmed", "in_progress"];
+const PERSONAL_KEYS: ReadonlySet<string> = new Set(["position", "job_description"]);
 const EMPTY: Form = {
   company_name: "",
   company_tax_code: "",
@@ -162,6 +172,25 @@ function Editor({
   const extract = useAction();
 
   const editable = !row || EDITABLE.includes(row.status);
+  // Hồ sơ đã nộp mà còn hiệu lực: mở riêng phần cá nhân (vị trí, mô tả công việc, hình thức).
+  const personalOnly = !editable && row !== null && row !== undefined && PERSONAL_EDITABLE.includes(row.status);
+  const canEdit = (key: string) => editable || (personalOnly && (PERSONAL_KEYS.has(key) || key === "mode"));
+  const personal = useAction(reload);
+  // Phòng thủ: chưa có hồ sơ thì BE có thể không có danh sách giấy.
+  const documents = detail.documents ?? [];
+  // Mỗi hồ sơ chỉ có MỘT giấy tiếp nhận (tải giấy mới thì thay giấy cũ); hồ sơ cũ còn nhiều giấy thì chỉ hiện giấy mới nhất.
+  const doc = documents.length > 0 ? documents[documents.length - 1] : null;
+  // Khối tải giấy tiếp nhận: dùng ở cả thẻ "Thông tin thực tập" và thẻ giấy tiếp nhận (cùng một tệp, cùng một popup xem lại).
+  const uploadRow = doc ? (
+    <Row>
+      <DownloadDoc href={`/api/documents/${doc.id}/download`} name={doc.filename} />
+      <span>({fmtDate(doc.uploaded_at)})</span>
+    </Row>
+  ) : (
+    <DropZone label="Tải giấy tiếp nhận" accept=".pdf,.png,.jpg,.jpeg" disabled={!editable || docs.busy || extract.busy} onFile={(file) => setPreviewFile(file)}>
+      {editable ? "Chưa tải giấy tiếp nhận (PDF, ảnh chụp hoặc bản scan). Bấm vào đây hoặc kéo thả tệp để tải lên, AI sẽ tự điền các trường." : "Hồ sơ đã nộp nên không tải thêm giấy tiếp nhận."}
+    </DropZone>
+  );
 
   function set<K extends keyof Form>(key: K, value: Form[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -233,6 +262,13 @@ function Editor({
   }
 
   const blocking = checks.filter((c) => !c.ok && c.level === "error");
+  // Mọi ô của hồ sơ đều bắt buộc (dấu *): còn ô trống thì chưa cho nộp. Backend vẫn kiểm riêng các trường cốt lõi.
+  const missing = ALL_FIELDS.filter((f) => !String(form[f.key] ?? "").trim());
+  // Chỉ hiện các mục chưa đạt (thiếu hoặc sai); mục đạt không liệt kê.
+  const problems = checks.filter((c) => !c.ok);
+  // Kết quả kiểm tra là của bản ĐÃ LƯU. Form khác bản đã lưu (vd AI vừa điền, hoặc đang sửa) thì kết quả cũ chưa phản ánh.
+  const savedRow = (row ?? {}) as unknown as Record<string, unknown>;
+  const dirty = row ? [...ALL_FIELDS.map((f) => f.key), "mode"].some((k) => String(form[k as keyof Form] ?? "") !== String(savedRow[k] ?? "")) : false;
 
   return (
     <>
@@ -245,22 +281,29 @@ function Editor({
             </span>
           </Row>
           {row.decision_reason && <p>Lý do từ giảng viên: {row.decision_reason}</p>}
-          {!editable && <p>Hồ sơ đã nộp nên không sửa tại chỗ. Nếu giảng viên yêu cầu sửa, bạn sẽ chỉnh và nộp lại.</p>}
+          {!editable && (
+            <p>
+              {personalOnly
+                ? "Hồ sơ đã nộp: thông tin công ty và thời gian đã khóa; bạn chỉ sửa được vị trí, mô tả công việc và hình thức thực tập."
+                : "Hồ sơ đã kết thúc nên không sửa được."}
+            </p>
+          )}
         </Card>
       )}
 
       <Card title="Thông tin thực tập">
+        {uploadRow}
         {FIELDS.map((f) => (
-          <Field key={f.key} label={f.label} hint={confirmations[f.key] === "ai_confirmed" ? (pulseSave ? "AI điền từ giấy: kiểm tra rồi bấm Lưu bản nháp" : "Giá trị do AI gợi ý, bạn đã xác nhận") : undefined}>
+          <Field key={f.key} required label={f.label} hint={confirmations[f.key] === "ai_confirmed" ? (pulseSave ? "AI điền từ giấy: kiểm tra rồi bấm Lưu bản nháp" : "Giá trị do AI gợi ý, bạn đã xác nhận") : undefined}>
             {f.wide ? (
-              <textarea value={form[f.key]} disabled={!editable} onChange={(e) => set(f.key, e.target.value as never)} />
+              <textarea value={form[f.key]} disabled={!canEdit(f.key)} onChange={(e) => set(f.key, e.target.value as never)} />
             ) : (
-              <input type={f.type ?? "text"} value={form[f.key]} disabled={!editable} onChange={(e) => set(f.key, e.target.value as never)} />
+              <input type={f.type ?? "text"} value={form[f.key]} disabled={!canEdit(f.key)} onChange={(e) => set(f.key, e.target.value as never)} />
             )}
           </Field>
         ))}
-        <Field label="Hình thức thực tập">
-          <select value={form.mode} disabled={!editable} onChange={(e) => set("mode", e.target.value as Form["mode"])}>
+        <Field required label="Hình thức thực tập">
+          <select value={form.mode} disabled={!canEdit("mode")} onChange={(e) => set("mode", e.target.value as Form["mode"])}>
             {Object.entries(MODE_LABEL).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -268,8 +311,27 @@ function Editor({
             ))}
           </select>
         </Field>
-        <ErrorText message={save.error} />
+        <ErrorToast title="Không lưu được bản nháp" message={save.error} />
         <OkText message={message} />
+        {personalOnly && (
+          <>
+            <ErrorToast title="Không lưu được thông tin cá nhân" message={personal.error} />
+            <Row>
+              <Button
+                variant="primary"
+                disabled={personal.busy || !form.position.trim() || !form.job_description.trim()}
+                onClick={() =>
+                  void personal.run(async () => {
+                    await send("PUT", "/api/student/internship/personal", { position: form.position, job_description: form.job_description, mode: form.mode });
+                    setMessage("Đã lưu thông tin cá nhân.");
+                  })
+                }
+              >
+                Lưu thông tin cá nhân
+              </Button>
+            </Row>
+          </>
+        )}
         {editable && (
           <div ref={saveRef}>
             <Row>
@@ -283,22 +345,21 @@ function Editor({
 
       {(row || editable) && (
         <Card title="Giấy tiếp nhận của doanh nghiệp">
-          {detail.documents.length === 0 && <Empty>Chưa tải giấy tiếp nhận (PDF, ảnh chụp hoặc bản scan). Tải lên để AI tự điền các trường.</Empty>}
-          {detail.documents.map((doc) => (
-            <Row key={doc.id}>
-              <DownloadDoc href={`/api/documents/${doc.id}/download`} name={doc.filename} />
-              <span>({fmtDate(doc.uploaded_at)})</span>
-              {editable && (
-                <Button disabled={extract.busy} onClick={() => void runExtract(doc.id)}>
-                  AI gợi ý các trường
+          {uploadRow}
+          <div className="mt-3 border-t border-foreground/15 pt-3">
+            {RECEIPT_FIELDS.map((f) => (
+              <Field key={f.key} required label={f.label} hint={confirmations[f.key] === "ai_confirmed" ? (pulseSave ? "AI điền từ giấy: kiểm tra rồi bấm Lưu bản nháp" : "Giá trị do AI gợi ý, bạn đã xác nhận") : undefined}>
+                <input type={f.type ?? "text"} value={form[f.key]} disabled={!canEdit(f.key)} onChange={(e) => set(f.key, e.target.value as never)} />
+              </Field>
+            ))}
+            {editable && (
+              <Row>
+                <Button disabled={save.busy} className={pulseSave ? PULSE : undefined} onClick={() => void saveDraft()}>
+                  Lưu bản nháp
                 </Button>
-              )}
-            </Row>
-          ))}
-          <Row>
-            <FilePicker label="Tải giấy tiếp nhận" accept=".pdf,.png,.jpg,.jpeg" disabled={!editable || docs.busy || extract.busy} onFile={(file) => setPreviewFile(file)} />
-            {!editable && <span className="text-sm text-muted-foreground">Hồ sơ đã nộp nên không tải thêm giấy tiếp nhận.</span>}
-          </Row>
+              </Row>
+            )}
+          </div>
           <EvidencePreviewDialog
             title="Xem lại giấy tiếp nhận"
             file={previewFile}
@@ -311,7 +372,8 @@ function Editor({
             }}
           />
           {extract.busy && <p className="text-sm text-muted-foreground">AI đang đọc giấy...</p>}
-          <ErrorText message={docs.error ?? extract.error} />
+          <ErrorToast title="Không tải được giấy tiếp nhận" message={docs.error} />
+          <ErrorToast title="Không đọc được thông tin từ giấy tiếp nhận" message={extract.error} />
           {note && <p>{note}</p>}
           {warnings.map((w) => (
             <p key={w} className="text-sm font-medium text-red-600" role="alert">
@@ -327,7 +389,7 @@ function Editor({
               {Object.entries(suggestions).map(([key, s]) => (
                 <Row key={key}>
                   <span>
-                    {FIELDS.find((f) => f.key === key)?.label ?? (key === "mode" ? "Hình thức thực tập" : key)}: <strong>{key === "mode" ? (MODE_LABEL[s.value as Form["mode"]] ?? s.value) : s.value}</strong>
+                    {ALL_FIELDS.find((f) => f.key === key)?.label ?? (key === "mode" ? "Hình thức thực tập" : key)}: <strong>{key === "mode" ? (MODE_LABEL[s.value as Form["mode"]] ?? s.value) : s.value}</strong>
                   </span>
                   <Badge tone={s.confidence >= 0.8 ? "good" : "warn"}>Tin cậy {Math.round(s.confidence * 100)}%</Badge>
                   {s.source && <span>Nguồn: “{s.source}”</span>}
@@ -341,11 +403,28 @@ function Editor({
 
       {row && editable && (
         <Card title="Kiểm tra trước khi nộp">
+          {dirty && (
+            <div className="mb-3">
+              <NoticeCard tone="warning" title="Có thay đổi chưa lưu">
+                <p className="m-0">Kết quả bên dưới là của bản đã lưu, chưa tính các ô vừa điền hoặc sửa. Lưu bản nháp để kiểm tra lại.</p>
+                <div className="mt-2">
+                  <Button variant="primary" disabled={save.busy} onClick={() => void saveDraft()}>
+                    {save.busy ? "Đang lưu..." : "Lưu và kiểm tra lại"}
+                  </Button>
+                </div>
+              </NoticeCard>
+            </div>
+          )}
           {checks.length === 0 && <Empty>Lưu bản nháp để xem kết quả kiểm tra.</Empty>}
-          {checks.map((c) => (
-            <div key={c.code}>
+          {checks.length > 0 && problems.length === 0 && !dirty && (
+            <p className="m-0 flex items-center gap-2 text-sm font-medium text-green-700">
+              <CheckCircle2 aria-hidden className="size-4" /> Không có mục nào cần sửa, có thể nộp hồ sơ.
+            </p>
+          )}
+          {problems.map((c) => (
+            <div key={c.code} className={dirty ? "opacity-50" : undefined}>
               <Row>
-                <Badge tone={c.ok ? "good" : c.level === "error" ? "bad" : "warn"}>{c.ok ? "Đạt" : c.level === "error" ? "Lỗi" : "Lưu ý"}</Badge>
+                <Badge tone={c.level === "error" ? "bad" : "warn"}>{c.level === "error" ? "Lỗi" : "Lưu ý"}</Badge>
                 <span>
                   {c.label}
                   {c.detail && ` — ${c.detail}`}
@@ -360,11 +439,17 @@ function Editor({
               )}
             </div>
           ))}
-          <ErrorText message={submit.error} />
-          <Button variant="primary" disabled={submit.busy || save.busy || blocking.length > 0} onClick={() => void submitIt()}>
+        </Card>
+      )}
+
+      {row && editable && (
+        <div>
+          <ErrorToast title="Không nộp được hồ sơ" message={submit.error} />
+          <Button disabled={submit.busy || save.busy || dirty || blocking.length > 0 || missing.length > 0} onClick={() => void submitIt()}>
             Nộp hồ sơ cho giảng viên
           </Button>
-        </Card>
+          {missing.length > 0 && <p className="mb-0 mt-2 text-sm text-muted-foreground">Còn {missing.length} ô bắt buộc chưa điền.</p>}
+        </div>
       )}
     </>
   );
