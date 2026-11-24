@@ -15,6 +15,9 @@ Trang `/` trước đây chỉ chuyển hướng theo vai trò; người chưa �
 - Landing: bỏ biểu tượng trên card, dải bốn mục, ảnh giao diện Trợ lý (`fe/public/landing/assistant.png`), card bốn bước viền be + số be (token `beige`, `beige-strong`).
 - Tách cột ngày bắt đầu/kết thúc (danh sách hồ sơ, hiệu lực quy định), bỏ cột Neo ở Mốc mẫu.
 - `/student/milestones`: dòng thời gian dọc (mốc xong xanh, mốc tiếp theo nổi bật, quá hạn viền đỏ). Chưa có "minh chứng yêu cầu"/"căn cứ điều khoản" vì BE chưa trả.
+- Trang sinh viên: `/student` (giai đoạn hiện tại gộp mốc, nhắc việc, thông tin thực tập), `/student/final`, `/student/grades` (tín chỉ thực tập lên đầu), form gửi đơn gia hạn tại chỗ, lỗi hồ sơ dạng toast (`ErrorToast`), mọi ô hồ sơ đánh dấu bắt buộc.
+- Trang giảng viên/quản trị: rủi ro tiến độ (menu ba chấm, lọc thời gian/gấp), yêu cầu chờ duyệt, chi tiết hồ sơ (nhật ký mỗi tuần một card, đề cương với menu ba chấm, nhận xét AI một lần xem, popup thông tin trên giấy khi bấm dòng mốc, cột Cảnh báo).
+- `global_exception_handler`: tệp không còn trong kho trả 404 thay vì 500.
 
 ## Kiểm tra
 - `tsc --noEmit` và `eslint` sạch; `GET /` trả 200. Xem bằng mắt qua ảnh chụp do người dùng gửi.

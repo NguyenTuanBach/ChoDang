@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import base64
 
-from vin15.domain.exception import InvalidInputError, ResourceNotFoundError
+from vin15.domain.exception import InvalidInputError, ResourceNotFoundError, StateConflictError
 from vin15.domain.model.user import User
 from vin15.domain.ports import FileStorage
 from vin15.infrastructure.agent_api import AgentApiClient
 from vin15.infrastructure.persistence.case_repository import CaseRepository
 from vin15.service.files.upload import RECEIPT_TYPES, sniff_mime
 from vin15.service.internship.internship_service import InternshipService
-from vin15.service.milestone.evidence_check import COMPLETION_FIELDS, normalize
+from vin15.service.milestone.evidence_check import COMPLETION_FIELDS, names_differ, normalize
 from vin15.service.milestone.milestone_service import MilestoneService
 
 #: Tên trường phía agent → cột hồ sơ. ``student_name``/``student_code`` chỉ để đối chiếu, không ghi vào hồ sơ.
@@ -41,6 +41,9 @@ RECEIPT_MAP = {
 _IDENTITY = ("student_name", "student_code")
 _AGENT_TIMEOUT = 120.0
 _COMPLETION_MILESTONE = "M5"
+#: Bốn phần của đề cương (khớp agent ``OUTLINE_FIELDS`` và form ở FE).
+_OUTLINE_FIELDS = ("objective", "tasks", "plan", "results")
+_OUTLINE_VALUE_LIMIT = 4000
 
 
 class IntakeService:
@@ -86,7 +89,16 @@ class IntakeService:
                 "kind": kind, "target_page": "milestones", "document_id": None, "evidence_id": evidence_id,
                 "fields": self._clean(body, COMPLETION_FIELDS), "notes": str(body.get("notes", ""))[:500], "warnings": [],
             }
-        raise InvalidInputError(str(body.get("notes") or "Không nhận ra loại giấy (giấy tiếp nhận hoặc giấy xác nhận thực tập)")[:300])
+        if kind == "outline":
+            # Đề cương không lưu ở đây: chỉ gợi ý bốn phần, FE chuyển sang trang Đề cương và điền nháp; SV kiểm tra rồi mới nộp.
+            row = self._cases.student_internship(student.id)
+            if row is None or row["status"] != "confirmed":
+                raise StateConflictError("Chỉ tải đề cương khi hồ sơ đã được giảng viên xác nhận")
+            return {
+                "kind": kind, "target_page": "outline", "document_id": None, "evidence_id": None,
+                "fields": self._clean(body, _OUTLINE_FIELDS, limit=_OUTLINE_VALUE_LIMIT), "notes": str(body.get("notes", ""))[:500], "warnings": [],
+            }
+        raise InvalidInputError(str(body.get("notes") or "Không nhận ra loại giấy (giấy tiếp nhận, giấy xác nhận thực tập hoặc đề cương)")[:300])
 
     # ---- nội bộ ----
     async def _ask(self, filename: str, mime: str, data: bytes, kind: str, fields: list[str]) -> dict:
@@ -107,7 +119,7 @@ class IntakeService:
         return {"fields": fields, "notes": str(body.get("notes", ""))[:500], "warnings": warnings}
 
     @staticmethod
-    def _clean(body: dict, allowed) -> dict:
+    def _clean(body: dict, allowed, limit: int = 2000) -> dict:
         fields = {}
         for name, item in (body.get("fields") or {}).items():
             if name not in allowed or not isinstance(item, dict) or item.get("value") in (None, ""):
@@ -116,14 +128,14 @@ class IntakeService:
                 confidence = max(0.0, min(1.0, float(item.get("confidence", 0))))
             except (TypeError, ValueError):
                 confidence = 0.0
-            fields[name] = {"value": str(item["value"])[:2000], "confidence": confidence, "source": str(item.get("source", ""))[:300]}
+            fields[name] = {"value": str(item["value"])[:limit], "confidence": confidence, "source": str(item.get("source", ""))[:300]}
         return fields
 
     @staticmethod
     def _identity_warnings(student: User, raw: dict) -> list[str]:
         out = []
         name = normalize(raw.get("student_name", {}).get("value"))
-        if name and normalize(student.full_name) and name != normalize(student.full_name):
+        if names_differ(name, normalize(student.full_name)):
             out.append(f"Tên sinh viên trên giấy ({raw['student_name']['value']}) khác tên tài khoản ({student.full_name}).")
         code = normalize(raw.get("student_code", {}).get("value")).replace(" ", "")
         if code and student.student_code and code != normalize(student.student_code).replace(" ", ""):

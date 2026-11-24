@@ -55,6 +55,14 @@ class InternshipDraftBody(BaseModel):
     confirmations: dict[str, Literal["ai_confirmed", "manual"]] = Field(default_factory=dict)
 
 
+class InternshipPersonalBody(BaseModel):
+    """Phần cá nhân sửa được sau khi nộp hồ sơ; trường nào không gửi thì giữ nguyên."""
+
+    position: str | None = Field(default=None, max_length=200)
+    job_description: str | None = Field(default=None, max_length=5000)
+    mode: Literal["onsite", "remote", "hybrid"] | None = None
+
+
 class EvidenceFieldsBody(BaseModel):
     """Trường SV đã xác nhận từ giấy xác nhận / phiếu đánh giá (M5). Khóa lạ bị BE bỏ qua."""
 

@@ -24,6 +24,21 @@ router = APIRouter(tags=["Đề cương, mốc, nhật ký, minh chứng"])
 
 
 # ---- Đề cương ----
+@router.post("/api/student/outlines/extract", summary="Tải tệp đề cương: AI đọc và gợi ý bốn phần để điền form (không lưu, SV kiểm tra rồi mới nộp)")
+async def extract_outline_file(file: UploadFile = File(...), student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    return await app.outline_review_service.extract_file(student, file.filename or "dec-cuong", read_upload(file, app.settings.upload_max_bytes))
+
+
+@router.post("/api/student/outlines/{outline_id}/file", status_code=201, summary="Đính kèm tệp đề cương đã nộp (lưu bản gốc cho giảng viên mở)")
+async def attach_outline_file(outline_id: int, file: UploadFile = File(...), student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    return app.outline_review_service.attach_file(student, outline_id, file.filename or "dec-cuong", read_upload(file, app.settings.upload_max_bytes))
+
+
+@router.get("/api/outlines/{outline_id}/file", summary="Tải tệp đề cương (kiểm quyền: chủ hồ sơ, GV phụ trách, QTV)")
+def download_outline_file(outline_id: int, user: User = Depends(current_user), app: Container = Depends(container)) -> Response:
+    return file_response(*app.outline_review_service.file_bytes(user, outline_id))
+
+
 @router.post("/api/student/outlines", status_code=201, summary="Nộp đề cương (phiên bản mới)")
 async def submit_outline(body: OutlineBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
     # Có lỗi chắc chắn thì saved=false (không lưu) kèm chỗ sai và nhận xét AI; chuẩn đầu ra do AI nhận diện, không còn tích tay.

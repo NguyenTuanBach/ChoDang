@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from vin15.config.container import Container
 from vin15.domain.exception import InvalidInputError
 from vin15.domain.model.user import Role, User
-from vin15.presentation.dto.workflow import DecisionBody, InternshipDraftBody, PreReviewBody
+from vin15.presentation.dto.workflow import DecisionBody, InternshipDraftBody, InternshipPersonalBody, PreReviewBody
 
 from .dependencies import container, current_user, lecturer_user, staff_user, student_user
 
@@ -37,7 +37,20 @@ def my_internship(student: User = Depends(student_user), app: Container = Depend
     row = app.internship_service.mine(student)
     outcomes = app.outline_service.outcomes_for(row["cohort"] if row else app.settings.current_cohort)
     if row is None:
-        return {"internship": None, "outcomes": outcomes, "checks": []}
+        # Chưa có hồ sơ: vẫn trả đủ các danh sách (rỗng) để trang không phải xử lý khóa thiếu.
+        return {
+            "internship": None,
+            "documents": [],
+            "outlines": [],
+            "milestones": [],
+            "journals": [],
+            "evidence": [],
+            "requests": [],
+            "flags": [],
+            "suggestions": [],
+            "outcomes": outcomes,
+            "checks": [],
+        }
     detail = app.report_service.detail(student, row["id"])
     detail["outcomes"] = outcomes
     detail["checks"] = app.internship_service.validate(row) if row["status"] in ("draft", "revision_requested") else []
@@ -50,6 +63,12 @@ def save_internship(body: InternshipDraftBody, student: User = Depends(student_u
     confirmations = data.pop("confirmations", {})
     row = app.internship_service.save_draft(student, data, confirmations)
     return {"internship": row, "checks": app.internship_service.validate(row)}
+
+
+@router.put("/api/student/internship/personal", summary="Sau khi nộp hồ sơ: chỉ sửa phần cá nhân (vị trí, mô tả công việc, hình thức)")
+def update_personal(body: InternshipPersonalBody, student: User = Depends(student_user), app: Container = Depends(container)) -> dict:
+    row = app.internship_service.update_personal(student, body.position, body.job_description, body.mode)
+    return {"internship": row}
 
 
 @router.post("/api/student/internship/documents", status_code=201, summary="Tải giấy tiếp nhận (PDF/PNG/JPG)")

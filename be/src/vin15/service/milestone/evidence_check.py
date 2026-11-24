@@ -40,6 +40,12 @@ def normalize(text: str | None) -> str:
     return " ".join(re.sub(r"[^a-z0-9]+", " ", raw).split())
 
 
+def names_differ(a: str, b: str) -> bool:
+    """Hai chuỗi đã chuẩn hóa khác nhau thật sự: cả hai có chữ, không bằng nhau và không chuỗi nào chứa chuỗi kia
+    (AI hay đọc tên rút gọn, ví dụ "Sinh viên H" so với "Sinh viên H (test giấy tiếp nhận)")."""
+    return bool(a and b) and a != b and a not in b and b not in a
+
+
 def _company(text: str | None) -> str:
     return " ".join(_COMPANY_NOISE.sub(" ", normalize(text)).split())
 
@@ -62,8 +68,7 @@ def check_completion(fields: dict[str, str], internship: dict, student_name: str
     def add(field: str, label: str, detail: str) -> None:
         out.append({"field": field, "label": label, "detail": detail})
 
-    def differs(a: str, b: str) -> bool:
-        return bool(a and b) and a != b and a not in b and b not in a
+    differs = names_differ
 
     if differs(_company(fields.get("company_name")), _company(internship.get("company_name"))):
         add("company_name", "Tên doanh nghiệp khác hồ sơ", f"Giấy: {fields.get('company_name')} · Hồ sơ: {internship.get('company_name')}")

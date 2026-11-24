@@ -33,7 +33,7 @@ class IntakeRequest(BaseModel):
     mime: str = Field(max_length=100)
     content_b64: str
     fields: list[str] = Field(default_factory=list, max_length=30)
-    kind: Literal["receipt_letter", "completion_letter", "auto"] = "receipt_letter"
+    kind: Literal["receipt_letter", "completion_letter", "outline", "auto"] = "receipt_letter"
 
 
 def register_structured_agents(app: FastAPI, *, settings: Settings, ai: AiClient, require_service_token, prompts: PromptLoader | None = None) -> None:

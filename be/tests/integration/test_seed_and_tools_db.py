@@ -12,7 +12,15 @@ from fastapi.testclient import TestClient
 from tests.conftest import make_settings
 from tests.fakes import TODAY
 from vin15.config.container import Container
-from vin15.devtools.dev_seed import STUDENT_A_EMAIL, STUDENT_B_EMAIL, STUDENT_C_EMAIL, STUDENT_D_EMAIL, SeedRefusedError, read_policy_files, run_seed
+from vin15.devtools.dev_seed import (
+    STUDENT_A_EMAIL,
+    STUDENT_B_EMAIL,
+    STUDENT_C_EMAIL,
+    STUDENT_D_EMAIL,
+    SeedRefusedError,
+    read_policy_files,
+    run_seed,
+)
 from vin15.main import create_app
 
 SERVICE = {"Authorization": "Bearer svc-token"}

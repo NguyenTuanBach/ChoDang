@@ -17,6 +17,10 @@ from .audit_repository import insert_audit
 from .database import Database
 from .transitions import NOW, lock_status, set_status
 
+#: Phần cá nhân của hồ sơ, sinh viên vẫn sửa được sau khi nộp (không phải thông tin công ty hay thời gian).
+PERSONAL_FIELDS = ("position", "job_description", "mode")
+PERSONAL_EDITABLE_STATUSES = ("submitted", "confirmed", "in_progress")
+
 PROFILE_FIELDS = (
     "company_name",
     "company_tax_code",
@@ -83,6 +87,24 @@ class CaseRepository:
                 f"update internship set {', '.join(assignments)} where id = %s", [*clean.values(), Jsonb(merged), internship_id]
             )
 
+    def update_personal(self, internship_id: int, fields: dict[str, Any], audit: AuditEntry) -> None:
+        """Sửa phần cá nhân của hồ sơ (vị trí, mô tả công việc, hình thức) sau khi đã nộp; thông tin công ty và thời gian vẫn khóa.
+
+        Chỉ khi hồ sơ còn hiệu lực (``submitted``, ``confirmed``, ``in_progress``); không đổi trạng thái và không tạo phiên bản mới.
+        """
+        clean = {k: v for k, v in fields.items() if k in PERSONAL_FIELDS}
+        if not clean:
+            return
+        with self._db.connection() as conn:
+            row = conn.execute("select status from internship where id = %s for update", (internship_id,)).fetchone()
+            if row is None:
+                raise ResourceNotFoundError("Không tìm thấy hồ sơ")
+            if row["status"] not in PERSONAL_EDITABLE_STATUSES:
+                raise StateConflictError("Hồ sơ ở trạng thái này không sửa được thông tin cá nhân")
+            assignments = ", ".join(f"{name} = %s" for name in clean)
+            conn.execute(f"update internship set {assignments} where id = %s", [*clean.values(), internship_id])
+            insert_audit(conn, _entity(audit, internship_id))
+
     def submit_internship(self, internship_id: int, source: str, audit: AuditEntry) -> None:
         """Nộp hồ sơ: chụp một phiên bản (BR-S4) và chuyển trạng thái."""
         with self._db.connection() as conn:
@@ -132,6 +154,22 @@ class CaseRepository:
                 "values (%s, %s, %s, %s, %s, %s, %s) returning id",
                 (internship_id, filename, mime, size, sha256, key, uploaded_by),
             ).fetchone()["id"]
+
+    def replace_document(self, internship_id: int, filename: str, mime: str, size: int, sha256: str, key: str, uploaded_by: int) -> tuple[int, list[str]]:
+        """Thêm giấy tiếp nhận mới và xóa các giấy cũ cùng một transaction: mỗi hồ sơ chỉ giữ MỘT giấy tiếp nhận (giấy mới thay giấy cũ).
+
+        Trả ``(id giấy mới, danh sách khóa tệp của các giấy cũ)`` để người gọi xóa tệp khỏi kho sau khi đã ghi DB.
+        """
+        with self._db.connection() as conn:
+            new_id = conn.execute(
+                "insert into internship_document (internship_id, filename, mime, size_bytes, sha256, storage_key, uploaded_by) "
+                "values (%s, %s, %s, %s, %s, %s, %s) returning id",
+                (internship_id, filename, mime, size, sha256, key, uploaded_by),
+            ).fetchone()["id"]
+            old = conn.execute(
+                "delete from internship_document where internship_id = %s and id <> %s returning storage_key", (internship_id, new_id)
+            ).fetchall()
+        return new_id, [row["storage_key"] for row in old if row["storage_key"]]
 
     def documents(self, internship_id: int) -> list[dict]:
         with self._db.connection() as conn:
@@ -245,10 +283,19 @@ class CaseRepository:
     def outlines(self, internship_id: int) -> list[dict]:
         with self._db.connection() as conn:
             return conn.execute(
-                "select id, internship_id, version, content, outcome_codes, status, feedback, ai_review, submitted_at, decided_at "
+                "select id, internship_id, version, content, outcome_codes, status, feedback, ai_review, submitted_at, decided_at, file_name, file_size "
                 "from outline where internship_id = %s order by version desc",
                 (internship_id,),
             ).fetchall()
+
+    def attach_outline_file(self, outline_id: int, filename: str, mime: str, size: int, key: str) -> bool:
+        """Gắn tệp vào phiên bản đề cương nếu chưa có tệp. Trả ``False`` khi đã có (để người gọi xóa tệp vừa lưu)."""
+        with self._db.connection() as conn:
+            row = conn.execute(
+                "update outline set file_name = %s, file_mime = %s, file_size = %s, file_key = %s where id = %s and file_key is null returning id",
+                (filename, mime, size, key, outline_id),
+            ).fetchone()
+        return row is not None
 
     def get_outline(self, outline_id: int) -> dict | None:
         with self._db.connection() as conn:

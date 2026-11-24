@@ -258,7 +258,9 @@ class Container:
 
     @cached_property
     def outline_review_service(self) -> OutlineReviewService:
-        return OutlineReviewService(self.outline_service, self.case_repository, self.agent_client, self.pii_redactor)
+        return OutlineReviewService(
+            self.outline_service, self.case_repository, self.agent_client, self.pii_redactor, self.file_storage, self.settings.upload_max_bytes
+        )
 
     @cached_property
     def outline_service(self) -> OutlineService:

@@ -123,7 +123,7 @@
     },
     {
       "key": "flags",
-      "label": "Cờ rủi ro",
+      "label": "Rủi ro tiến độ",
       "description": "cờ rủi ro (mốc quá hạn, thiếu nhật ký, minh chứng yếu)",
       "filters": {
         "status": {

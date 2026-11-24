@@ -128,3 +128,58 @@ def test_not_confirmed_internship_cannot_submit():
         assert type(error).__name__ == "StateConflictError"
     else:
         raise AssertionError("phải ném StateConflictError")
+
+
+# ---- Tải tệp đề cương: AI đọc và gợi ý bốn phần ----
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+def test_text_file_is_sent_to_agent_as_plain_text_and_fields_are_cleaned():
+    agent = FakeAgent({
+        "kind": "outline",
+        "fields": {
+            "objective": {"value": "  Nắm quy trình web.  ", "confidence": 0.9},
+            "plan": {"value": "Tuần 1-12", "confidence": 0.8},
+            "company_name": {"value": "không thuộc đề cương"},
+            "tasks": {"value": "   "},
+        },
+        "notes": "ok",
+    })
+    svc, _ = service(agent)
+    result = run(svc.extract_file(STUDENT, "dc.txt", FULL.encode()))
+    path, payload = agent.calls[0]
+    assert path == "/v1/intake/extract" and payload["kind"] == "outline" and payload["mime"] == "text/plain"
+    assert set(payload["fields"]) == {"objective", "tasks", "plan", "results"}
+    assert result["fields"] == {"objective": {"value": "Nắm quy trình web."}, "plan": {"value": "Tuần 1-12"}}
+    assert result["notes"] == "ok"
+
+
+def test_image_is_sent_unchanged_with_its_real_mime():
+    agent = FakeAgent({"fields": {}})
+    svc, _ = service(agent)
+    run(svc.extract_file(STUDENT, "dc.png", PNG))
+    assert agent.calls[0][1]["mime"] == "image/png"
+
+
+def test_unsupported_or_empty_file_is_rejected_before_calling_the_agent():
+    agent = FakeAgent({"fields": {}})
+    svc, _ = service(agent)
+    for name, data in (("dc.exe", b"MZ\x90\x00xxxx"), ("dc.txt", b"")):
+        try:
+            run(svc.extract_file(STUDENT, name, data))
+        except Exception as error:  # noqa: BLE001
+            assert type(error).__name__ == "InvalidInputError"
+        else:
+            raise AssertionError("phải ném InvalidInputError")
+    assert agent.calls == []
+
+
+def test_extract_requires_confirmed_internship():
+    cases = SimpleNamespace(student_internship=lambda user_id: {"id": 1, "status": "in_progress", "cohort": "2026-K1", "lecturer_id": 2})
+    svc = OutlineReviewService(FakeOutlines(), cases, FakeAgent({"fields": {}}), FakeRedactor())
+    try:
+        run(svc.extract_file(STUDENT, "dc.txt", FULL.encode()))
+    except Exception as error:  # noqa: BLE001
+        assert type(error).__name__ == "StateConflictError"
+    else:
+        raise AssertionError("phải ném StateConflictError")

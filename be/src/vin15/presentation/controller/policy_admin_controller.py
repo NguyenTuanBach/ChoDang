@@ -16,7 +16,6 @@ from vin15.presentation.dto.policy_admin import (
     PolicyPreviewResponse,
     PolicyVersionDto,
 )
-
 from vin15.service.policy.policy_file_reader import MAX_FILE_BYTES
 
 from .dependencies import admin_user, container

@@ -5,6 +5,7 @@ Nội dung đã nộp được chụp phiên bản và không sửa tại chỗ 
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, timedelta
 
@@ -100,6 +101,40 @@ class InternshipService:
         self._cases.update_profile(current["id"], fields, confirmations)
         return self._cases.get_internship(current["id"]) or current
 
+    def update_personal(self, student: User, position: str | None, job_description: str | None, mode: str | None) -> dict:
+        """Sau khi nộp hồ sơ, sinh viên chỉ sửa được phần cá nhân: vị trí, mô tả công việc, hình thức. Thông tin công ty và thời gian bị khóa."""
+        current = self._cases.student_internship(student.id)
+        if current is None:
+            raise ResourceNotFoundError("Chưa có hồ sơ thực tập")
+        if current["status"] in _EDITABLE:
+            raise StateConflictError("Hồ sơ đang ở bản nháp, hãy dùng nút Lưu bản nháp")
+        fields: dict = {}
+        if position is not None:
+            fields["position"] = position.strip()
+        if job_description is not None:
+            fields["job_description"] = job_description.strip()
+        if mode is not None:
+            fields["mode"] = mode
+        for name, label in (("position", "Vị trí thực tập"), ("job_description", "Mô tả công việc")):
+            if name in fields and not fields[name]:
+                raise InvalidInputError(f"{label} không được để trống")
+        self._check_fields(fields)
+        self._cases.update_personal(
+            current["id"],
+            fields,
+            AuditEntry(
+                actor_kind=ActorKind.HUMAN,
+                actor_id=student.id,
+                actor_role=student.role.value,
+                entity="internship",
+                action="update_personal",
+                before={k: str(current.get(k) or "") for k in fields},
+                after=fields,
+                reason="Sinh viên sửa thông tin cá nhân sau khi nộp hồ sơ",
+            ),
+        )
+        return self._cases.get_internship(current["id"]) or current
+
     @staticmethod
     def _check_fields(fields: dict) -> None:
         start, end = fields.get("start_date"), fields.get("end_date")
@@ -116,7 +151,13 @@ class InternshipService:
         if current["status"] not in _EDITABLE:
             raise StateConflictError("Hồ sơ đã nộp, không tải thêm tệp")
         stored = store_upload(self._storage, f"{_DOC_PREFIX}/{current['id']}", filename, data, RECEIPT_TYPES, self._max_bytes)
-        doc_id = self._cases.add_document(current["id"], stored.filename, stored.mime, stored.size, stored.sha256, stored.key, student.id)
+        # Giấy mới thay giấy cũ: DB chỉ giữ một giấy tiếp nhận; tệp cũ xóa khỏi kho sau khi đã ghi DB (lỗi xóa tệp không làm hỏng thao tác).
+        doc_id, old_keys = self._cases.replace_document(current["id"], stored.filename, stored.mime, stored.size, stored.sha256, stored.key, student.id)
+        for key in old_keys:
+            try:
+                self._storage.delete(key)
+            except Exception:  # noqa: BLE001
+                logging.getLogger(__name__).warning("Không xóa được tệp giấy tiếp nhận cũ %s", key, exc_info=True)
         return {"id": doc_id, "filename": stored.filename, "mime": stored.mime, "size_bytes": stored.size}
 
     def document_bytes(self, viewer: User, document_id: int) -> tuple[bytes, str, str]:
